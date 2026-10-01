@@ -120,13 +120,14 @@
         ${tile("users", "Intercesión", "Sáb y dom · " + esc(cfg().hora_intercesion), "#intercesion")}
         ${tile("book", "Protocolos", "Sismo, ROHI, cursos", "#protocolos")}
         ${coord ? tile("users", "Asistentes", "Quién se registró a la intercesión", "#asistentes", isPro() ? "Todos los equipos" : esc(p.equipo || "Tu equipo")) : ""}
-        ${coord ? tile("clip", "Recibo de turno", "Próximamente · Fase 2", "#", "Coordinador", true) : ""}
-        ${coord ? tile("cal", "Asistencia", "Próximamente · Fase 2", "#", "Coordinador", true) : ""}
+        ${coord ? tile("clip", "Recibo de turno", "Checklist de equipos", "#turno", "Coordinador") : ""}
+        ${coord ? tile("cal", "Asistencia", "Servicios y apoyo semanal", "#asistencia", "Coordinador") : ""}
         ${tile("grad", "Capacitaciones", "Próximamente · Fase 3", "#", "", true)}
         ${coord ? tile("chart", "Indicadores", "Próximamente · Fase 3", "#", "Coordinador", true) : ""}
       </div>
       ${ses ? `<a class="card" href="#intercesion" style="text-decoration:none;color:inherit"><div class="row"><span class="lbl">Próxima intercesión</span>${reg ? '<span class="pill ok">Registrado</span>' : '<span class="pill">Google Meet</span>'}</div><div class="big">${esc(cap(fechaLarga(ses.fecha)))} · ${esc(ses.hora)}</div></a>` : ""}
       <div class="calls"><a class="call plain" href="tel:${esc(cfg().tel_rohi)}">${ic("phone", 18)}Llamar ROHI</a><a class="call red" href="tel:123">${ic("phone", 18)}Línea 123</a></div>
+      ${isPro() ? `<a class="link" href="#config">${ic("edit", 18)}Configuración de la brigada</a>` : ""}
       <button class="link" id="bInstalar" type="button" ${esStandalone() ? "hidden" : ""}>${ic("download", 18)}Instalar la app en este celular</button>
     </main>`;
   }
@@ -237,6 +238,252 @@
     if (/^#asistentes/.test(location.hash)) route();
   }
 
+  /* =================== FASE 2 =================== */
+  const ROL_TXT = { brigadista: "Brigadista", coordinador: "Coordinador de equipo", pro: "Coordinador general" };
+  const hoyLocal = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  const fechaCorta = iso => { if (!iso) return ""; const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" }); };
+  const $ = sel => document.querySelector(sel);
+  const loadingMain = t => `<main><div class="loading">${esc(t || "Cargando…")}</div></main>`;
+  const opts = (arr, sel) => arr.map(x => `<option ${x === sel ? "selected" : ""}>${esc(x)}</option>`).join("");
+
+  /* ---------- recibo de turno ---------- */
+  function vTurno() {
+    if (!isCoord()) return vInicio();
+    const T = S.turno;
+    const head = topbar("Recibo de turno", "Checklist de revisión", "#inicio", isPro() ? "General" : "Coordinador");
+    if (!T) return head + loadingMain("Cargando checklist…");
+    const F = S.turnoForm || (S.turnoForm = { equipo: T.equipos.indexOf(S.perfil.equipo) >= 0 ? S.perfil.equipo : T.equipos[0], servicio: T.servicios[0], fecha: T.hoy, entrega: "", items: {}, obs: "" });
+    const hechos = T.items.filter(i => F.items[i]).length, malos = T.items.filter(i => F.items[i] && F.items[i] !== "bien").length;
+    const segs = it => [["bien", "Bien"], ["revisar", "Revisar"], ["falta", "Falta"]].map(([k, t]) => `<button type="button" class="st st-${k}" data-it="${esc(it)}" data-st="${k}" aria-pressed="${F.items[it] === k}">${t}</button>`).join("");
+    return head + `<main style="gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label class="f"><span class="lbl">Equipo</span><select class="inp" id="tEq" ${T.equipos.length < 2 ? "disabled" : ""}>${opts(T.equipos, F.equipo)}</select></label>
+        <label class="f"><span class="lbl">Fecha</span><input class="inp" id="tFecha" type="date" value="${esc(F.fecha)}"></label>
+      </div>
+      <label class="f"><span class="lbl">Servicio</span><select class="inp" id="tServ">${opts(T.servicios, F.servicio)}</select></label>
+      <label class="f"><span class="lbl">Entrega el turno</span><select class="inp" id="tEnt"><option value="">Nadie · primer turno del día</option>${opts(T.coordinadores, F.entrega)}</select></label>
+      <div class="card" style="gap:4px">
+        <div class="row"><span class="big">Checklist</span><span class="pill ${hechos === T.items.length ? (malos ? "warn" : "ok") : ""}" id="tCount">${hechos} de ${T.items.length} revisados${malos ? " · " + malos + " con novedad" : ""}</span></div>
+        ${T.items.map(it => `<div class="chk"><span class="chk-n">${esc(it)}</span><div class="sts" role="group" aria-label="${esc(it)}">${segs(it)}</div></div>`).join("")}
+      </div>
+      <label class="f"><span class="lbl">Observaciones${malos ? " · obligatorio" : ""}</span><textarea class="inp" id="tObs" rows="3" style="min-height:90px" placeholder="Ej: botiquín 2 sin gasas, termómetro sin batería">${esc(F.obs)}</textarea></label>
+      <div class="hint">Recibe: <b>${esc(S.perfil.nombre)}</b> · la hora se guarda al confirmar</div>
+      <p class="err" id="tErr" hidden></p>
+      <button class="btn primary" id="tBtn" type="button">${ic("check", 20)}Confirmar recibo de turno</button>
+      <div class="row" style="margin-top:8px"><span class="big">Últimos turnos</span>${!isPro() ? `<span class="pill">${esc(S.perfil.equipo || "")}</span>` : ""}</div>
+      ${T.recientes.length ? T.recientes.map(t => `<div class="card" style="gap:6px;padding:12px 14px"><div class="row"><b>${esc(cap(fechaCorta(t.fecha)))} · ${esc(t.servicio)}</b>${t.novedades.length ? `<span class="pill warn">${t.novedades.length} novedad${t.novedades.length > 1 ? "es" : ""}</span>` : '<span class="pill ok">Sin novedad</span>'}</div>
+        <div style="font-size:13px;color:var(--muted)">${esc(t.equipo)} · Recibió ${esc(t.recibe)}${t.entrega ? " · Entregó " + esc(t.entrega) : ""}</div>
+        ${t.novedades.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${t.novedades.map(n => `<span class="pill ${n.estado === "falta" ? "bad" : "warn"}">${esc(n.item)}: ${n.estado === "falta" ? "Falta" : "Revisar"}</span>`).join("")}</div>` : ""}
+        ${t.observaciones ? `<div style="font-size:14px">${esc(t.observaciones)}</div>` : ""}</div>`).join("") : `<div class="card" style="color:var(--muted)">Aún no hay turnos registrados.</div>`}
+    </main>`;
+  }
+  async function cargarTurno() {
+    if (S.turnoLoading) return; S.turnoLoading = true;
+    try { S.turno = await api("turnoDatos"); } catch (e) { toast(e.message); location.hash = "#inicio"; return; } finally { S.turnoLoading = false; }
+    if (/^#turno/.test(location.hash)) route();
+  }
+  function bindTurno() {
+    if (!S.turno) { cargarTurno(); return; }
+    const F = S.turnoForm;
+    const sync = () => { F.equipo = $("#tEq").value; F.fecha = $("#tFecha").value; F.servicio = $("#tServ").value; F.entrega = $("#tEnt").value; F.obs = $("#tObs").value; };
+    ["#tEq", "#tFecha", "#tServ", "#tEnt"].forEach(id => $(id).addEventListener("change", sync));
+    $("#tObs").addEventListener("input", sync);
+    $app.querySelectorAll("[data-st]").forEach(b => b.addEventListener("click", () => { sync(); F.items[b.dataset.it] = b.dataset.st; const y = window.scrollY; route(); window.scrollTo(0, y); }));
+    $("#tBtn").addEventListener("click", async () => {
+      sync(); showErr("tErr", "");
+      const falta = S.turno.items.filter(i => !F.items[i]);
+      if (falta.length) { showErr("tErr", "Falta revisar: " + falta.join(", ")); return; }
+      const b = $("#tBtn"); setBusy(b, true);
+      try {
+        const r = await api("guardarTurno", { datos: { equipo: F.equipo, fecha: F.fecha, servicio: F.servicio, entrega: F.entrega, items: F.items, observaciones: F.obs } });
+        toast(r.novedades ? "Turno recibido con " + r.novedades + " novedad(es)" : "Turno recibido sin novedades");
+        S.turnoForm = null; S.turno = null; route();
+      } catch (e) { showErr("tErr", e.message); setBusy(b, false); }
+    });
+  }
+
+  /* ---------- asistencia a servicios ---------- */
+  function vAsistencia() {
+    if (!isCoord()) return vInicio();
+    const A = S.asisSrv;
+    const head = topbar("Asistencia", "Servicios y apoyo semanal", "#inicio", isPro() ? "General" : "Coordinador");
+    if (!A) return head + loadingMain("Cargando brigadistas…");
+    const M = S.asisMarks;
+    const pres = A.roster.filter(r => M.pres.has(r.celular)).length;
+    const apoyoInfo = c => A.candidatosApoyo.find(x => x.celular === c) || { nombre: c, equipo: "" };
+    const libres = A.candidatosApoyo.filter(c => !M.apoyos.has(c.celular));
+    return head + `<main style="gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label class="f"><span class="lbl">Servicio</span><select class="inp" id="sServ">${opts(A.servicios, A.servicio)}</select></label>
+        <label class="f"><span class="lbl">Fecha</span><input class="inp" id="sFecha" type="date" value="${esc(A.fecha)}"></label>
+      </div>
+      ${A.equipos.length > 1 ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${A.equipos.map(e => `<button type="button" class="chipbtn" data-seq="${esc(e)}" aria-pressed="${e === A.equipo}">${esc(e)}</button>`).join("")}</div>` : ""}
+      <div class="row"><span class="big">${esc(A.equipo)}</span><span class="pill ${pres ? "ok" : ""}">${pres} de ${A.roster.length} presentes</span></div>
+      ${A.guardado ? `<div class="hint">${ic("check", 16, "var(--ok)")}Ya registrada por ${esc(A.guardado)}. Si guardas, se actualiza.</div>` : ""}
+      ${A.roster.length ? `<button class="link" id="sTodos" type="button" style="align-self:flex-start;padding:4px 0">${pres === A.roster.length ? "Desmarcar todos" : "Marcar todos"}</button>
+      <div style="display:flex;flex-direction:column;gap:8px">${A.roster.map(r => `<button type="button" class="person" data-pc="${esc(r.celular)}" aria-pressed="${M.pres.has(r.celular)}"><span class="box">${M.pres.has(r.celular) ? ic("check", 16, "#fff", 3) : ""}</span><span>${esc(r.nombre)}</span></button>`).join("")}</div>`
+        : `<div class="card" style="color:var(--muted)">No hay brigadistas activos en ${esc(A.equipo)}. ${isPro() ? "Agrégalos en Configuración → Usuarios." : "Pide a un coordinador general que los registre."}</div>`}
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+        <span class="big">Apoyo semanal</span>
+        <span class="hint">Brigadistas de otros equipos que apoyan este servicio.</span>
+        ${[...M.apoyos].map(c => { const a = apoyoInfo(c); return `<div class="person" aria-pressed="true" style="cursor:default"><span class="box">${ic("check", 16, "#fff", 3)}</span><span>${esc(a.nombre)} <span style="color:var(--muted);font-weight:400">· ${esc(a.equipo)}</span></span><button type="button" class="x" data-rmap="${esc(c)}" aria-label="Quitar apoyo">✕</button></div>`; }).join("")}
+        ${libres.length ? `<div style="display:flex;gap:8px"><select class="inp" id="sApoyo"><option value="">Elegir brigadista de otro equipo</option>${libres.map(c => `<option value="${esc(c.celular)}">${esc(c.nombre)} · ${esc(c.equipo)}</option>`).join("")}</select><button class="iconbtn" id="sAddAp" type="button" aria-label="Agregar apoyo" style="background:var(--blue);width:50px;height:50px">${ic("plus", 20)}</button></div>` : ""}
+      </div>
+      <p class="err" id="sErr" hidden></p>
+      <button class="btn primary" id="sBtn" type="button">${ic("check", 20)}Guardar asistencia</button>
+    </main>`;
+  }
+  async function cargarAsisSrv(q) {
+    S.asisLoading = true; S.asisSrv = null; route();
+    try { S.asisSrv = await api("asistenciaDatos", { datos: q || {} }); } catch (e) { S.asisLoading = false; toast(e.message); location.hash = "#inicio"; return; }
+    S.asisLoading = false;
+    S.asisMarks = { pres: new Set(S.asisSrv.presentes), apoyos: new Set(S.asisSrv.apoyos) };
+    if (/^#asistencia/.test(location.hash)) route();
+  }
+  function bindAsistencia() {
+    if (!S.asisSrv) { if (!S.asisLoading) cargarAsisSrv(S.asisQ); return; }
+    const A = S.asisSrv, M = S.asisMarks;
+    const re = () => { const y = window.scrollY; route(); window.scrollTo(0, y); };
+    const q = () => ({ servicio: $("#sServ").value, fecha: $("#sFecha").value, equipo: A.equipo });
+    $("#sServ").addEventListener("change", () => { S.asisQ = q(); cargarAsisSrv(S.asisQ); });
+    $("#sFecha").addEventListener("change", () => { S.asisQ = q(); cargarAsisSrv(S.asisQ); });
+    $app.querySelectorAll("[data-seq]").forEach(b => b.addEventListener("click", () => { S.asisQ = Object.assign(q(), { equipo: b.dataset.seq }); cargarAsisSrv(S.asisQ); }));
+    $app.querySelectorAll("[data-pc]").forEach(b => b.addEventListener("click", () => { const c = b.dataset.pc; M.pres.has(c) ? M.pres.delete(c) : M.pres.add(c); re(); }));
+    const t = $("#sTodos"); if (t) t.addEventListener("click", () => { const all = A.roster.every(r => M.pres.has(r.celular)); A.roster.forEach(r => all ? M.pres.delete(r.celular) : M.pres.add(r.celular)); re(); });
+    $app.querySelectorAll("[data-rmap]").forEach(b => b.addEventListener("click", () => { M.apoyos.delete(b.dataset.rmap); re(); }));
+    const ad = $("#sAddAp"); if (ad) ad.addEventListener("click", () => { const v = $("#sApoyo").value; if (!v) { toast("Elige un brigadista"); return; } M.apoyos.add(v); re(); });
+    $("#sBtn").addEventListener("click", async () => {
+      showErr("sErr", ""); const b = $("#sBtn"); setBusy(b, true);
+      try {
+        const r = await api("guardarAsistencia", { datos: Object.assign(q(), { presentes: [...M.pres], apoyos: [...M.apoyos] }) });
+        toast("Asistencia guardada · " + r.presentes + " presentes"); S.asisQ = q(); cargarAsisSrv(S.asisQ);
+      } catch (e) { showErr("sErr", e.message); setBusy(b, false); }
+    });
+  }
+
+  /* ---------- configuración (solo Pro) ---------- */
+  const LISTA_TXT = { Ministerios: "Ministerios", Equipos: "Equipos de brigada", Servicios: "Servicios", ChecklistTurno: "Checklist de recibo de turno" };
+  function vConfig(sub, arg) {
+    if (!isPro()) return vInicio();
+    const C = S.cfg;
+    if (!C) return topbar("Configuración", "Solo coordinadores generales", "#inicio", "General") + loadingMain();
+    if (sub === "usuarios") return vCfgUsuarios();
+    if (sub === "usuario") return vCfgUsuario(arg);
+    if (sub === "lista") return vCfgLista(arg);
+    if (sub === "general") return vCfgGeneral();
+    const act = C.usuarios.filter(u => u.activo).length;
+    const item = (href, icon, t, s) => `<a class="prow" href="${href}"><span class="ico">${ic(icon, 22)}</span><span><span class="t" style="display:block">${t}</span><span class="s">${s}</span></span><span class="go">${ic("chev", 18)}</span></a>`;
+    return topbar("Configuración", "Solo coordinadores generales", "#inicio", "General") + `<main style="gap:12px">
+      ${item("#config/usuarios", "users", "Usuarios", act + " activos · roles, equipos y PIN")}
+      ${Object.keys(LISTA_TXT).map(k => item("#config/lista/" + k, k === "ChecklistTurno" ? "clip" : k === "Servicios" ? "cal" : k === "Equipos" ? "users" : "book", LISTA_TXT[k], C.listas[k].filter(x => x.activo).length + " activos")).join("")}
+      ${item("#config/general", "edit", "Enlaces y datos generales", "Meet, formulario, ROHI, hora de intercesión")}
+      <div class="prow" style="opacity:.55"><span class="ico">${ic("edit", 22)}</span><span><span class="t" style="display:block">Apariencia · colores y logo</span><span class="s">Próximamente · Fase 3</span></span></div>
+    </main>`;
+  }
+  function vCfgUsuarios() {
+    const C = S.cfg, q = (S.uq || "").toLowerCase(), f = S.uf || "";
+    const eqs = C.listas.Equipos.map(e => e.nombre);
+    const L = C.usuarios.filter(u => (!f || u.equipo === f) && (!q || (u.nombre + " " + u.celular).toLowerCase().includes(q)));
+    return topbar("Usuarios", C.usuarios.length + " registrados", "#config", "General") + `<main style="gap:12px">
+      <a class="btn primary" href="#config/usuario/nuevo">${ic("plus", 20)}Agregar usuario</a>
+      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:8px"><input class="inp" id="uQ" type="search" placeholder="Buscar nombre o celular" value="${esc(S.uq || "")}"><select class="inp" id="uF"><option value="">Todos</option>${opts(eqs, f)}</select></div>
+      ${L.map(u => `<a class="prow" href="#config/usuario/${esc(u.celular)}" style="${u.activo ? "" : "opacity:.5"}"><span class="ico">${ic(u.rol === "brigadista" ? "user" : "users", 20)}</span><span style="min-width:0"><span class="t" style="display:block">${esc(u.nombre)}</span><span class="s">${esc(u.celular)} · ${esc(u.equipo)}${u.activo ? "" : " · inactivo"}</span></span><span class="pill" style="margin-left:auto">${esc(ROL_TXT[u.rol])}</span></a>`).join("") || `<div class="card" style="color:var(--muted)">No hay usuarios con ese filtro.</div>`}
+    </main>`;
+  }
+  function vCfgUsuario(cel) {
+    const C = S.cfg, nuevo = cel === "nuevo";
+    const u = nuevo ? { celular: "", nombre: "", rol: "brigadista", equipo: C.listas.Equipos.find(e => e.activo)?.nombre || "", activo: true } : C.usuarios.find(x => x.celular === cel);
+    if (!u) return vCfgUsuarios();
+    const eqs = C.listas.Equipos.filter(e => e.activo || e.nombre === u.equipo).map(e => e.nombre);
+    const yo = u.celular === S.perfil.celular;
+    return topbar(nuevo ? "Nuevo usuario" : "Editar usuario", nuevo ? "" : u.nombre, "#config/usuarios", "General") + `<main>
+      <form id="fUser" data-original="${esc(u.celular)}" style="display:flex;flex-direction:column;gap:14px" novalidate>
+        <label class="f"><span class="lbl">Nombre completo</span><input class="inp" id="uNom" value="${esc(u.nombre)}" required></label>
+        <label class="f"><span class="lbl">Celular (con este ingresa)</span><input class="inp" id="uCel" type="tel" inputmode="numeric" value="${esc(u.celular)}" required></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <label class="f"><span class="lbl">Rol</span><select class="inp" id="uRol" ${yo ? "disabled" : ""}>${Object.keys(ROL_TXT).map(k => `<option value="${k}" ${k === u.rol ? "selected" : ""}>${ROL_TXT[k]}</option>`).join("")}</select></label>
+          <label class="f"><span class="lbl">Equipo</span><select class="inp" id="uEq">${opts(eqs, u.equipo)}</select></label>
+        </div>
+        <label class="f"><span class="lbl">${nuevo ? "PIN (4 a 6 números)" : "Nuevo PIN (déjalo vacío para no cambiarlo)"}</span><input class="inp" id="uPin" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="${nuevo ? "Ej: 4827" : "••••"}"></label>
+        <label class="f"><span class="lbl">Estado</span><select class="inp" id="uAct" ${yo ? "disabled" : ""}><option value="si" ${u.activo ? "selected" : ""}>Activo · puede ingresar</option><option value="no" ${!u.activo ? "selected" : ""}>Inactivo · sin acceso</option></select></label>
+        ${yo ? `<div class="hint">${ic("lock", 16)}No puedes cambiar tu propio rol ni desactivarte.</div>` : ""}
+        <div class="note">Comparte el PIN con la persona en privado. Si un coordinador de equipo cambia de equipo, verá solo los registros del equipo nuevo.</div>
+        <p class="err" id="uErr" hidden></p>
+        <button class="btn primary" id="uBtn" type="submit">${ic("check", 20)}${nuevo ? "Crear usuario" : "Guardar cambios"}</button>
+      </form>
+    </main>`;
+  }
+  function vCfgLista(n) {
+    const C = S.cfg; if (!C.listas[n]) return vConfig();
+    const L = S.listaEdit && S.listaEdit.n === n ? S.listaEdit.items : (S.listaEdit = { n, items: C.listas[n].map(x => Object.assign({}, x)) }).items;
+    const warn = n === "Equipos" ? "Cambiar el nombre de un equipo no actualiza a los usuarios ni los registros anteriores. Para dejar de usarlo, desactívalo." : "Para dejar de usar un elemento, desactívalo en lugar de borrarlo: así los registros anteriores conservan su nombre.";
+    return topbar(LISTA_TXT[n], "Lista editable", "#config", "General") + `<main style="gap:10px">
+      <div class="note">${warn}</div>
+      ${L.map((x, i) => `<div class="lrow"><input class="inp" data-li="${i}" value="${esc(x.nombre)}" aria-label="Nombre"><button type="button" class="tog" data-lt="${i}" aria-pressed="${x.activo}">${x.activo ? "Activo" : "Inactivo"}</button>${n === "ChecklistTurno" ? `<button type="button" class="x" data-lu="${i}" aria-label="Subir" ${i ? "" : "disabled"}>↑</button>` : ""}<button type="button" class="x" data-ld="${i}" aria-label="Quitar">✕</button></div>`).join("")}
+      <button class="link" id="lAdd" type="button" style="align-self:flex-start">${ic("plus", 18)}Agregar</button>
+      <p class="err" id="lErr" hidden></p>
+      <button class="btn primary" id="lBtn" type="button">${ic("check", 20)}Guardar lista</button>
+    </main>`;
+  }
+  function vCfgGeneral() {
+    const G = S.cfg.general;
+    const fld = (k, l, ph, type) => `<label class="f"><span class="lbl">${l}</span><input class="inp" data-gk="${k}" type="${type || "text"}" value="${esc(G[k])}" placeholder="${esc(ph || "")}"></label>`;
+    return topbar("Enlaces y datos generales", "", "#config", "General") + `<main style="gap:14px">
+      ${fld("meet_intercesion", "Enlace de Meet de la intercesión", "https://meet.google.com/…", "url")}
+      ${fld("form_incidentes", "Formulario de registro de incidentes", "https://forms.gle/…", "url")}
+      ${fld("tel_rohi", "Teléfono ROHI", "3336033012", "tel")}
+      ${fld("hora_intercesion", "Hora de la intercesión", "6:00 a.m.")}
+      ${fld("nombre_app", "Nombre de la app", "Brigada MCI Mosquera")}
+      <p class="err" id="gErr" hidden></p>
+      <button class="btn primary" id="gBtn" type="button">${ic("check", 20)}Guardar</button>
+    </main>`;
+  }
+  async function cargarCfg() {
+    try { S.cfg = await api("configDatos"); } catch (e) { toast(e.message); location.hash = "#inicio"; return; }
+    if (/^#config/.test(location.hash)) route();
+  }
+  function bindConfig(sub, arg) {
+    if (!S.cfg) { if (!S.cfgLoading) { S.cfgLoading = true; cargarCfg().finally(() => S.cfgLoading = false); } return; }
+    if (sub === "usuarios") {
+      const qi = $("#uQ"); qi.addEventListener("input", () => { S.uq = qi.value; const p = qi.selectionStart; route(); const n = $("#uQ"); n.focus(); n.setSelectionRange(p, p); });
+      $("#uF").addEventListener("change", e => { S.uf = e.target.value; route(); });
+    }
+    if (sub === "usuario") {
+      const f = $("#fUser"); if (!f) return;
+      f.addEventListener("submit", async e => {
+        e.preventDefault(); showErr("uErr", "");
+        const datos = { original: f.dataset.original, nombre: $("#uNom").value.trim(), celular: $("#uCel").value.replace(/\D/g, ""), rol: $("#uRol").value, equipo: $("#uEq").value, pin: $("#uPin").value.trim(), activo: $("#uAct").value === "si" };
+        if (!datos.nombre || datos.celular.length < 7) { showErr("uErr", "Revisa el nombre y el celular."); return; }
+        if (!datos.original && !datos.pin) { showErr("uErr", "Asigna un PIN al nuevo usuario."); return; }
+        if (datos.pin && !/^\d{4,6}$/.test(datos.pin)) { showErr("uErr", "El PIN debe tener de 4 a 6 números."); return; }
+        const b = $("#uBtn"); setBusy(b, true);
+        try { S.cfg = await api("guardarUsuario", { datos }); toast(datos.original ? "Usuario actualizado" : "Usuario creado"); location.hash = "#config/usuarios"; }
+        catch (err) { showErr("uErr", err.message); setBusy(b, false); }
+      });
+    }
+    if (sub === "lista") {
+      const L = S.listaEdit.items, re = () => { const y = window.scrollY; route(); window.scrollTo(0, y); };
+      $app.querySelectorAll("[data-li]").forEach(i => i.addEventListener("input", () => { L[+i.dataset.li].nombre = i.value; }));
+      $app.querySelectorAll("[data-lt]").forEach(b => b.addEventListener("click", () => { const x = L[+b.dataset.lt]; x.activo = !x.activo; re(); }));
+      $app.querySelectorAll("[data-ld]").forEach(b => b.addEventListener("click", () => { L.splice(+b.dataset.ld, 1); re(); }));
+      $app.querySelectorAll("[data-lu]").forEach(b => b.addEventListener("click", () => { const i = +b.dataset.lu; if (i) { [L[i - 1], L[i]] = [L[i], L[i - 1]]; re(); } }));
+      $("#lAdd").addEventListener("click", () => { L.push({ nombre: "", activo: true }); re(); const ins = $app.querySelectorAll("[data-li]"); ins[ins.length - 1].focus(); });
+      $("#lBtn").addEventListener("click", async () => {
+        showErr("lErr", ""); const b = $("#lBtn"); setBusy(b, true);
+        try { S.cfg = await api("guardarLista", { datos: { lista: arg, items: L.filter(x => x.nombre.trim()) } }); S.listaEdit = null; cargarInicio(); toast("Lista guardada"); location.hash = "#config"; }
+        catch (err) { showErr("lErr", err.message); setBusy(b, false); }
+      });
+    }
+    if (sub === "general") {
+      $("#gBtn").addEventListener("click", async () => {
+        showErr("gErr", ""); const valores = {}; $app.querySelectorAll("[data-gk]").forEach(i => valores[i.dataset.gk] = i.value.trim());
+        const b = $("#gBtn"); setBusy(b, true);
+        try { S.cfg = await api("guardarConfig", { datos: { valores } }); await cargarInicio(); toast("Datos guardados"); location.hash = "#config"; }
+        catch (err) { showErr("gErr", err.message); setBusy(b, false); }
+      });
+    }
+  }
+
   /* ---------- instalación (PWA) ---------- */
   let deferred = null;
   const esIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -274,6 +521,10 @@
     if (S.token && h === "ingreso") { location.replace("#inicio"); return; }
     const [v, arg] = h.split("/");
     if (v !== "asistentes") { S.asis = null; S.asisEq = ""; S.asisFecha = ""; }
+    if (v !== "turno") { S.turno = null; S.turnoForm = null; }
+    if (v !== "asistencia") { S.asisSrv = null; S.asisQ = null; }
+    if (v !== "config") { S.cfg = null; S.uq = ""; S.uf = ""; }
+    if (!(v === "config" && arg === "lista")) S.listaEdit = null;
     let html;
     switch (v) {
       case "ingreso": html = vLogin(); break;
@@ -282,18 +533,21 @@
       case "protocolo": html = vProtocolo(arg); break;
       case "editar": html = vEditar(arg); break;
       case "asistentes": html = vAsistentes(); break;
+      case "turno": html = vTurno(); break;
+      case "asistencia": html = vAsistencia(); break;
+      case "config": html = vConfig(arg, h.split("/")[2]); break;
       default: html = vInicio();
     }
     $app.innerHTML = html;
     window.scrollTo(0, 0);
-    bind(v);
+    bind(v, h);
   }
   window.addEventListener("hashchange", route);
 
   function setBusy(btn, on, txt) { if (!btn) return; btn.disabled = on; if (on) { btn.dataset.t = btn.innerHTML; btn.textContent = txt || "Guardando…"; } else if (btn.dataset.t) btn.innerHTML = btn.dataset.t; }
   function showErr(id, m) { const e = document.getElementById(id); if (e) { e.textContent = m; e.hidden = !m; } }
 
-  function bind(v) {
+  function bind(v, h0) {
     if (v === "ingreso") {
       $app.querySelectorAll("[data-rol]").forEach(b => b.addEventListener("click", () => { S.rolLogin = b.dataset.rol; $app.querySelectorAll("[data-rol]").forEach(x => x.setAttribute("aria-pressed", x === b)); }));
       document.getElementById("fLogin").addEventListener("submit", async e => {
@@ -334,6 +588,9 @@
       const k = document.getElementById("bCorregir");
       if (k) k.addEventListener("click", () => { const r = S.data.registroSesion; S.equipoSel = r.equipo; store.set("brig_min", r.ministerio); store.set("brig_lider", r.lider_celula); S.data = Object.assign({}, S.data, { registroSesion: null }); route(); document.getElementById("iNom").value = r.nombre; });
     }
+    if (v === "turno") bindTurno();
+    if (v === "asistencia") bindAsistencia();
+    if (v === "config") bindConfig(h0.split("/")[1], h0.split("/")[2]);
     if (v === "asistentes") {
       if (!S.asis) { cargarAsistentes(S.asisFecha); return; }
       const sel = document.getElementById("aFecha"); if (sel) sel.addEventListener("change", () => { S.asisFecha = sel.value; S.asis = null; route(); });
@@ -373,7 +630,7 @@
     route();
     if (S.token) setTimeout(maybeOfferInstall, 1500);
   }
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.token) cargarInicio().then(ok => { if (ok && !/editar|intercesion/.test(location.hash)) route(); }); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.token) cargarInicio().then(ok => { if (ok && !/editar|intercesion|turno|asistencia|config/.test(location.hash)) route(); }); });
   if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
   start();
 })();

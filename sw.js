@@ -1,5 +1,5 @@
 /* Service worker: guarda la app para abrirla rápido y sin conexión. Sube la versión al cambiar archivos. */
-const VERSION = "brigada-v3";
+const VERSION = "brigada-v4";
 const SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./config.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/favicon.svg"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
