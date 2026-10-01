@@ -1,7 +1,7 @@
 /* Brigada MCI Mosquera · PWA · Fase 1 */
 (function () {
   "use strict";
-  const API = (window.BRIGADA_CONFIG || {}).API_URL || "";
+  const API = String((window.BRIGADA_CONFIG || {}).API_URL || "").trim();
   const $app = document.getElementById("app");
   const $toast = document.getElementById("toast");
 
