@@ -58,6 +58,7 @@
     const j = await r.json().catch(() => ({ ok: false, error: "Respuesta inválida del servidor" }));
     if (!j.ok) {
       if (j.error === "SESION") { salir(true); throw new Error("Tu sesión terminó. Ingresa de nuevo."); }
+      if (j.error === "Acción no válida") throw new Error("La API conectada está desactualizada (URL terminada en …" + API.slice(-14, -5) + "). Revisa config.js o publica una nueva versión.");
       throw new Error(j.error || "Ocurrió un error");
     }
     return j;
@@ -631,6 +632,11 @@
     if (S.token) setTimeout(maybeOfferInstall, 1500);
   }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.token) cargarInicio().then(ok => { if (ok && !/editar|intercesion|turno|asistencia|config/.test(location.hash)) route(); }); });
-  if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  if ("serviceWorker" in navigator) {
+    const tenia = !!navigator.serviceWorker.controller;
+    let recargado = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (tenia && !recargado) { recargado = true; location.reload(); } });
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(r => r.update()).catch(() => {}));
+  }
   start();
 })();
