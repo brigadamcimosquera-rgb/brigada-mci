@@ -143,3 +143,7 @@ select.inp:disabled{background-color:var(--sky);color:var(--navy);opacity:1}
 .lrow .x{margin-left:0}
 .tog{height:40px;padding:0 10px;border-radius:10px;font-size:13px;font-weight:700;border:1.5px solid var(--line);background:var(--white);color:var(--muted);cursor:pointer;flex:none}
 .tog[aria-pressed="true"]{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.done-banner{display:flex;gap:12px;align-items:flex-start;background:var(--ok-soft);color:var(--ok);border-radius:14px;padding:14px 16px;font-size:14px}
+.done-banner b{display:block;font-size:15px;color:var(--ok)}
+.done-banner div div{color:var(--ink);opacity:.8}
+.tagc{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--blue);background:var(--sky);padding:2px 7px;border-radius:999px;margin-left:4px}

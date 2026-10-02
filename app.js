@@ -320,9 +320,12 @@
       </div>
       ${A.equipos.length > 1 ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${A.equipos.map(e => `<button type="button" class="chipbtn" data-seq="${esc(e)}" aria-pressed="${e === A.equipo}">${esc(e)}</button>`).join("")}</div>` : ""}
       <div class="row"><span class="big">${esc(A.equipo)}</span><span class="pill ${pres ? "ok" : ""}">${pres} de ${A.roster.length} presentes</span></div>
-      ${A.guardado ? `<div class="hint">${ic("check", 16, "var(--ok)")}Ya registrada por ${esc(A.guardado)}. Si guardas, se actualiza.</div>` : ""}
+      ${A.guardado ? `<div class="done-banner">${ic("check", 22, "var(--ok)", 2.6)}<div><b>Asistencia ya confirmada por ${esc(A.guardado)}</b><div>${esc(cap(fechaCorta(A.fecha)))} · ${esc(A.servicio)}${A.guardadoEn ? " · " + esc(new Date(A.guardadoEn).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" })) : ""}</div></div></div>` : ""}
+      ${A.guardado && !S.asisEdit ? `<div style="display:flex;flex-direction:column;gap:8px">${A.roster.map(r => `<div class="person" aria-pressed="${M.pres.has(r.celular)}" style="cursor:default"><span class="box">${M.pres.has(r.celular) ? ic("check", 16, "#fff", 3) : ""}</span><span>${esc(r.nombre)}${r.rol !== "brigadista" ? ' <span class="tagc">Coord.</span>' : ""}</span><span style="margin-left:auto;white-space:nowrap;font-size:13px;color:${M.pres.has(r.celular) ? "var(--ok)" : "var(--muted)"}">${M.pres.has(r.celular) ? "Asistió" : "No asistió"}</span></div>`).join("")}
+        ${[...M.apoyos].map(c => { const a = apoyoInfo(c); return `<div class="person" aria-pressed="true" style="cursor:default"><span class="box">${ic("check", 16, "#fff", 3)}</span><span>${esc(a.nombre)} <span style="color:var(--muted);font-weight:400">· Apoyo ${esc(a.equipo)}</span></span></div>`; }).join("")}</div>
+        <button class="btn ghost" id="sEditar" type="button">${ic("edit", 20)}Corregir la lista</button>` : `
       ${A.roster.length ? `<button class="link" id="sTodos" type="button" style="align-self:flex-start;padding:4px 0">${pres === A.roster.length ? "Desmarcar todos" : "Marcar todos"}</button>
-      <div style="display:flex;flex-direction:column;gap:8px">${A.roster.map(r => `<button type="button" class="person" data-pc="${esc(r.celular)}" aria-pressed="${M.pres.has(r.celular)}"><span class="box">${M.pres.has(r.celular) ? ic("check", 16, "#fff", 3) : ""}</span><span>${esc(r.nombre)}</span></button>`).join("")}</div>`
+      <div style="display:flex;flex-direction:column;gap:8px">${A.roster.map(r => `<button type="button" class="person" data-pc="${esc(r.celular)}" aria-pressed="${M.pres.has(r.celular)}"><span class="box">${M.pres.has(r.celular) ? ic("check", 16, "#fff", 3) : ""}</span><span>${esc(r.nombre)}${r.rol !== "brigadista" ? ' <span class="tagc">Coord.</span>' : ""}</span></button>`).join("")}</div>`
         : `<div class="card" style="color:var(--muted)">No hay brigadistas activos en ${esc(A.equipo)}. ${isPro() ? "Agrégalos en Configuración → Usuarios." : "Pide a un coordinador general que los registre."}</div>`}
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
         <span class="big">Apoyo semanal</span>
@@ -331,14 +334,14 @@
         ${libres.length ? `<div style="display:flex;gap:8px"><select class="inp" id="sApoyo"><option value="">Elegir brigadista de otro equipo</option>${libres.map(c => `<option value="${esc(c.celular)}">${esc(c.nombre)} · ${esc(c.equipo)}</option>`).join("")}</select><button class="iconbtn" id="sAddAp" type="button" aria-label="Agregar apoyo" style="background:var(--blue);width:50px;height:50px">${ic("plus", 20)}</button></div>` : ""}
       </div>
       <p class="err" id="sErr" hidden></p>
-      <button class="btn primary" id="sBtn" type="button">${ic("check", 20)}Guardar asistencia</button>
+      <button class="btn primary" id="sBtn" type="button">${ic("check", 20)}${A.guardado ? "Guardar corrección" : "Confirmar asistencia"}</button>`}
     </main>`;
   }
   async function cargarAsisSrv(q) {
     S.asisLoading = true; S.asisSrv = null; route();
     try { S.asisSrv = await api("asistenciaDatos", { datos: q || {} }); } catch (e) { S.asisLoading = false; toast(e.message); location.hash = "#inicio"; return; }
     S.asisLoading = false;
-    S.asisMarks = { pres: new Set(S.asisSrv.presentes), apoyos: new Set(S.asisSrv.apoyos) };
+    S.asisMarks = { pres: new Set(S.asisSrv.presentes), apoyos: new Set(S.asisSrv.apoyos) }; S.asisEdit = false;
     if (/^#asistencia/.test(location.hash)) route();
   }
   function bindAsistencia() {
@@ -353,6 +356,8 @@
     const t = $("#sTodos"); if (t) t.addEventListener("click", () => { const all = A.roster.every(r => M.pres.has(r.celular)); A.roster.forEach(r => all ? M.pres.delete(r.celular) : M.pres.add(r.celular)); re(); });
     $app.querySelectorAll("[data-rmap]").forEach(b => b.addEventListener("click", () => { M.apoyos.delete(b.dataset.rmap); re(); }));
     const ad = $("#sAddAp"); if (ad) ad.addEventListener("click", () => { const v = $("#sApoyo").value; if (!v) { toast("Elige un brigadista"); return; } M.apoyos.add(v); re(); });
+    const ed = $("#sEditar"); if (ed) ed.addEventListener("click", () => { S.asisEdit = true; re(); });
+    if (!$("#sBtn")) return;
     $("#sBtn").addEventListener("click", async () => {
       showErr("sErr", ""); const b = $("#sBtn"); setBusy(b, true);
       try {
