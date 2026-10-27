@@ -1,6 +1,6 @@
 /* Service worker: guarda la app para abrirla rápido y sin conexión.
    Siempre pide primero la versión más nueva a internet (sin caché del navegador). */
-const VERSION = "brigada-v6";
+const VERSION = "brigada-v8";
 const SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./config.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/favicon.svg"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting())); });
