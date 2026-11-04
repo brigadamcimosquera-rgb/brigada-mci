@@ -39,6 +39,7 @@
     gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
     chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     gift: '<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M3 12h18M12 8v13M12 8c-2-4-6-4-6-1.5S9 8 12 8zm0 0c2-4 6-4 6-1.5S15 8 12 8z"/>',
+    barcode: '<path d="M4 5v14M7 5v14M10 5v14M14 5v14M17 5v14M20 5v14" stroke-width="1.6"/><path d="M2 9V4h4M18 4h4v5M22 15v5h-4M6 20H2v-5"/>',
     box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4V7z"/><path d="M3 7l9 4 9-4M12 11v10"/>', trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'
   };
   const ic = (n, s = 22, c = "currentColor", w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ICONS.book}</svg>`;
@@ -328,7 +329,7 @@
   
 
   /* ---------- configuración (solo Pro) ---------- */
-  const LISTA_TXT = { Ministerios: "Ministerios", Equipos: "Equipos de brigada", Servicios: "Servicios", ChecklistTurno: "Checklist de recibo de turno" };
+  const LISTA_TXT = { Ministerios: "Ministerios", Equipos: "Equipos de brigada", Servicios: "Servicios", ChecklistTurno: "Checklist de recibo de turno", CategoriasInv: "Categorías de inventario" };
   function vConfig(sub, arg) {
     if (!isPro()) return vInicio();
     const C = S.cfg;
@@ -342,7 +343,7 @@
     const item = (href, icon, t, s) => `<a class="prow" href="${href}"><span class="ico">${ic(icon, 22)}</span><span><span class="t" style="display:block">${t}</span><span class="s">${s}</span></span><span class="go">${ic("chev", 18)}</span></a>`;
     return topbar("Configuración", "Solo coordinadores generales", "#inicio", "General") + `<main style="gap:12px">
       ${item("#config/usuarios", "users", "Usuarios", act + " activos · roles, equipos y PIN")}
-      ${Object.keys(LISTA_TXT).map(k => item("#config/lista/" + k, k === "ChecklistTurno" ? "clip" : k === "Servicios" ? "cal" : k === "Equipos" ? "users" : "book", LISTA_TXT[k], C.listas[k].filter(x => x.activo).length + " activos")).join("")}
+      ${Object.keys(LISTA_TXT).map(k => item("#config/lista/" + k, k === "ChecklistTurno" ? "clip" : k === "CategoriasInv" ? "box" : k === "Servicios" ? "cal" : k === "Equipos" ? "users" : "book", LISTA_TXT[k], C.listas[k].filter(x => x.activo).length + " activos")).join("")}
       ${item("#config/general", "edit", "Enlaces y datos generales", "Meet, formulario, ROHI, hora de intercesión")}
       ${item("#config/apariencia", "edit", "Apariencia", "Colores y logo de la app")}
     </main>`;
@@ -386,9 +387,11 @@
     const L = S.listaEdit && S.listaEdit.n === n ? S.listaEdit.items : (S.listaEdit = { n, items: C.listas[n].map(x => Object.assign({}, x)) }).items;
     const warn = n === "Equipos" ? "Cambiar el nombre de un equipo no actualiza a los usuarios ni los registros anteriores. Para dejar de usarlo, desactívalo." : "Para dejar de usar un elemento, desactívalo en lugar de borrarlo: así los registros anteriores conservan su nombre.";
     return topbar(LISTA_TXT[n], "Lista editable", "#config", "General") + `<main style="gap:10px">
-      <div class="note">${warn}</div>
+      ${n === "CategoriasInv" ? "" : `<div class="note">${warn}</div>`}
       ${n === "Servicios" ? `<div class="note">Asigna el <b>día</b> a cada reunión. Así, en Asistencia de turno, todas las reuniones de ese día (por ejemplo las 3 del domingo) aparecen juntas para marcarlas de una vez.</div>` : ""}
-      ${L.map((x, i) => `<div class="lrow"><input class="inp" data-li="${i}" value="${esc(x.nombre)}" aria-label="Nombre">${n === "Servicios" ? `<select class="inp" data-ldia="${i}" aria-label="Día" style="flex:0 0 112px;padding-right:28px"><option value="">Cualquier día</option>${["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"].map(d => `<option value="${d}" ${x.dia === d ? "selected" : ""}>${cap(d)}</option>`).join("")}</select>` : ""}<button type="button" class="tog" data-lt="${i}" aria-pressed="${x.activo}">${x.activo ? "Activo" : "Inactivo"}</button>${n === "ChecklistTurno" ? `<button type="button" class="x" data-lu="${i}" aria-label="Subir" ${i ? "" : "disabled"}>↑</button>` : ""}<button type="button" class="x" data-ld="${i}" aria-label="Quitar">✕</button></div>`).join("")}
+      ${n === "CategoriasInv" ? `<div class="note">El código (CAT-01, CAT-02…) se asigna solo y no cambia, para no desordenar el inventario. Para dejar de usar una categoría, desactívala.</div>` : ""}
+      ${L.map((x, i) => n === "CategoriasInv" ? `<div class="card" style="gap:8px;padding:12px"><div class="row"><span class="catcode">${esc(x.codigo || "Nueva")}</span><span style="display:flex;gap:6px"><button type="button" class="tog" data-lt="${i}" aria-pressed="${x.activo}">${x.activo ? "Activo" : "Inactivo"}</button><button type="button" class="x" data-ld="${i}" aria-label="Quitar">✕</button></span></div>
+        <input class="inp" data-li="${i}" value="${esc(x.nombre)}" aria-label="Nombre de la categoría" placeholder="Nombre de la categoría"><input class="inp" data-ldesc="${i}" value="${esc(x.descripcion || "")}" aria-label="Elementos que incluye" placeholder="Elementos que incluye"></div>` : `<div class="lrow"><input class="inp" data-li="${i}" value="${esc(x.nombre)}" aria-label="Nombre">${n === "Servicios" ? `<select class="inp" data-ldia="${i}" aria-label="Día" style="flex:0 0 112px;padding-right:28px"><option value="">Cualquier día</option>${["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"].map(d => `<option value="${d}" ${x.dia === d ? "selected" : ""}>${cap(d)}</option>`).join("")}</select>` : ""}<button type="button" class="tog" data-lt="${i}" aria-pressed="${x.activo}">${x.activo ? "Activo" : "Inactivo"}</button>${n === "ChecklistTurno" ? `<button type="button" class="x" data-lu="${i}" aria-label="Subir" ${i ? "" : "disabled"}>↑</button>` : ""}<button type="button" class="x" data-ld="${i}" aria-label="Quitar">✕</button></div>`).join("")}
       <button class="link" id="lAdd" type="button" style="align-self:flex-start">${ic("plus", 18)}Agregar</button>
       <p class="err" id="lErr" hidden></p>
       <button class="btn primary" id="lBtn" type="button">${ic("check", 20)}Guardar lista</button>
@@ -435,6 +438,7 @@
       const L = S.listaEdit.items, re = () => { const y = window.scrollY; route(); window.scrollTo(0, y); };
       $app.querySelectorAll("[data-li]").forEach(i => i.addEventListener("input", () => { L[+i.dataset.li].nombre = i.value; }));
       $app.querySelectorAll("[data-ldia]").forEach(i => i.addEventListener("change", () => { L[+i.dataset.ldia].dia = i.value; }));
+      $app.querySelectorAll("[data-ldesc]").forEach(i => i.addEventListener("input", () => { L[+i.dataset.ldesc].descripcion = i.value; }));
       $app.querySelectorAll("[data-lt]").forEach(b => b.addEventListener("click", () => { const x = L[+b.dataset.lt]; x.activo = !x.activo; re(); }));
       $app.querySelectorAll("[data-ld]").forEach(b => b.addEventListener("click", () => { L.splice(+b.dataset.ld, 1); re(); }));
       $app.querySelectorAll("[data-lu]").forEach(b => b.addEventListener("click", () => { const i = +b.dataset.lu; if (i) { [L[i - 1], L[i]] = [L[i], L[i - 1]]; re(); } }));
@@ -531,7 +535,7 @@
   function bindIndicadores() { bindFiltro(() => { S.ind = null; route(); }); if (!S.ind) cargarInd(); }
 
   /* ---------- reportes ---------- */
-  const REPORTES = [["participacion", "cal", "Participación en servicios", "Por brigadista y por equipo, con apoyos"], ["intercesion", "users", "Intercesiones", "Por sesión, ministerio y equipo"], ["incidentes", "alert", "Registro de incidentes", "Quién registra, cuántos y por equipo"], ["turnos", "clip", "Novedades al recibir turno", "Elementos que más llegan mal"], ["capacitaciones", "grad", "Capacitaciones", "Asistencia, notas y aprobados"]];
+  const REPORTES = [["participacion", "cal", "Participación en servicios", "Por brigadista y por equipo, con apoyos"], ["intercesion", "users", "Intercesiones", "Por sesión, ministerio y equipo"], ["incidentes", "alert", "Registro de incidentes", "Quién registra, cuántos y por equipo"], ["turnos", "clip", "Novedades al recibir turno", "Elementos que más llegan mal"], ["capacitaciones", "grad", "Capacitaciones", "Asistencia, notas y aprobados"], ["inventario", "box", "Inventario de enfermería", "Existencias por categoría, alertas y movimientos"]];
   function vReportes() {
     if (!isPro()) return vInicio();
     const r = rangoFiltro(), R = S.rep;
@@ -1046,22 +1050,28 @@
     if (!V) return head + loadingMain();
     if (sub) return vInvItem(sub);
     const ub = S.invUb || V.ubicaciones[0], q = norm(S.invQ || "");
-    const L = V.items.filter(i => i.ubicacion === ub && (!q || norm(i.elemento + " " + i.categoria).includes(q)));
+    const catN = c => { const x = (V.categorias || []).find(k => k.codigo === c); return x ? x.nombre : (c || "Sin categoría"); };
+    const fc = S.invCat || "";
+    const enUb = V.items.filter(i => i.ubicacion === ub);
+    const L = enUb.filter(i => (!fc || i.categoria === fc) && (!q || norm(i.elemento + " " + catN(i.categoria) + " " + i.categoria).includes(q)));
+    const catsUb = (V.categorias || []).filter(c => enUb.some(i => i.categoria === c.codigo));
+    const grupos = [...new Set(L.map(i => i.categoria))].sort((a, b) => String(a || "ZZZ").localeCompare(String(b || "ZZZ")));
     const cnt = k => V.items.filter(i => i.ubicacion === ub && i.alertas.includes(k)).length;
     return head + `<main style="gap:12px">
       <div class="seg" role="group">${V.ubicaciones.map(u => `<button type="button" data-ub="${esc(u)}" aria-pressed="${u === ub}" style="font-size:13px">${esc(u)}</button>`).join("")}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${cnt("agotado") ? `<span class="pill bad">${cnt("agotado")} agotados</span>` : ""}${cnt("bajo") ? `<span class="pill warn">${cnt("bajo")} bajo mínimo</span>` : ""}${cnt("vencido") ? `<span class="pill bad">${cnt("vencido")} vencidos</span>` : ""}${cnt("porvencer") ? `<span class="pill warn">${cnt("porvencer")} vencen en 30 días</span>` : ""}${!["agotado", "bajo", "vencido", "porvencer"].some(cnt) ? '<span class="pill ok">Todo en orden</span>' : ""}</div>
-      <input class="inp" id="invQ" type="search" placeholder="Buscar elemento" value="${esc(S.invQ || "")}">
+      <div style="display:flex;gap:8px"><input class="inp" id="invQ" type="search" placeholder="Buscar elemento" value="${esc(S.invQ || "")}"><button class="btn primary" id="invScan" type="button" style="width:auto;flex:none">${ic("barcode", 20)}Escanear</button></div>
       ${V.puedeEditar ? `<a class="btn primary" href="#inventario/nuevo">${ic("plus", 20)}Agregar elemento</a>` : ""}
-      ${L.map(i => `<div class="invrow"><a href="#inventario/${esc(i.id)}" style="flex:1;min-width:0;text-decoration:none;color:inherit"><b style="display:block">${esc(i.elemento)}</b>
-        <span style="font-size:12px;color:var(--muted)">${esc(i.categoria || "")}${i.minimo ? " · mín. " + esc(i.minimo) : ""}${i.vence ? " · vence " + esc(i.vence) : ""}</span>
+      ${catsUb.length > 1 ? `<div class="chipscroll">${[{ codigo: "", nombre: "Todas" }].concat(catsUb).map(c => `<button type="button" class="chipbtn" data-cat="${esc(c.codigo)}" aria-pressed="${c.codigo === fc}">${c.codigo ? esc(c.codigo.replace("CAT-", "")) + " · " : ""}${esc(c.nombre)}${c.codigo ? " (" + enUb.filter(i => i.categoria === c.codigo).length + ")" : ""}</button>`).join("")}</div>` : ""}
+      ${grupos.map(g => `<div class="cathead"><span class="catcode">${esc(g && /^CAT-/.test(g) ? g : "—")}</span><b>${esc(catN(g))}</b><span class="pill">${L.filter(i => i.categoria === g).length}</span></div>` + L.filter(i => i.categoria === g).map(i => `<div class="invrow"><a href="#inventario/${esc(i.id)}" style="flex:1;min-width:0;text-decoration:none;color:inherit"><b style="display:block">${esc(i.elemento)}</b>
+        <span style="font-size:12px;color:var(--muted)">${i.codigo ? ic("barcode", 12) + " " : ""}${i.minimo ? "mín. " + esc(i.minimo) : ""}${i.vence ? " · vence " + esc(i.vence) : ""}</span>
         <span style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${i.alertas.map(a => `<span class="pill ${ALERTA_TXT[a][0]}">${ALERTA_TXT[a][1]}</span>`).join("")}</span></a>
-        <div class="stepper"><button type="button" data-adj="${esc(i.id)}" data-c="-1" aria-label="Restar uno a ${esc(i.elemento)}">−</button><span><b>${esc(i.cantidad)}</b><small>${esc(i.unidad || "und")}</small></span><button type="button" data-adj="${esc(i.id)}" data-c="1" aria-label="Sumar uno a ${esc(i.elemento)}">+</button></div></div>`).join("") || `<div class="card" style="color:var(--muted)">${V.items.some(i => i.ubicacion === ub) ? "Ningún elemento coincide." : "Aún no hay elementos en " + esc(ub) + "." + (V.puedeEditar ? " Agrégalos con el botón de arriba." : " Un coordinador Pro debe agregarlos.")}</div>`}
+        <div class="stepper"><button type="button" data-adj="${esc(i.id)}" data-c="-1" aria-label="Restar uno a ${esc(i.elemento)}">−</button><span><b>${esc(i.cantidad)}</b><small>${esc(i.unidad || "und")}</small></span><button type="button" data-adj="${esc(i.id)}" data-c="1" aria-label="Sumar uno a ${esc(i.elemento)}">+</button></div></div>`).join("")).join("") || `<div class="card" style="color:var(--muted)">${V.items.some(i => i.ubicacion === ub) ? "Ningún elemento coincide." : "Aún no hay elementos en " + esc(ub) + "." + (V.puedeEditar ? " Agrégalos con el botón de arriba." : " Un coordinador Pro debe agregarlos.")}</div>`}
       <div class="hint" style="display:block">− registra uso o consumo y + registra reposición. Cada cambio queda guardado con tu nombre en la hoja InventarioMov.</div>
     </main>`;
   }
   function vInvItem(id) {
-    const V = S.inv, nuevo = id === "nuevo", i = nuevo ? { id: "", ubicacion: S.invUb || V.ubicaciones[0], elemento: "", categoria: "", cantidad: "0", unidad: "", minimo: "", vence: "", lote: "", alertas: [] } : V.items.find(x => x.id === id);
+    const V = S.inv, nuevo = id === "nuevo", i = nuevo ? Object.assign({ id: "", ubicacion: S.invUb || V.ubicaciones[0], elemento: "", categoria: "", cantidad: "0", unidad: "", minimo: "", vence: "", lote: "", codigo: "", alertas: [] }, S.invPrefill || {}) : V.items.find(x => x.id === id);
     if (!i) return `<main><div class="card">El elemento ya no existe.</div></main>`;
     const head = topbar(nuevo ? "Nuevo elemento" : i.elemento, i.ubicacion, "#inventario", isPro() ? "General" : "Coordinador");
     const ajuste = nuevo ? "" : `<div class="card" style="gap:12px"><span class="big" style="font-size:17px">Ajustar cantidad</span><div class="kv"><span>Cantidad actual</span><b>${esc(i.cantidad)} ${esc(i.unidad || "")}</b></div>
@@ -1072,8 +1082,10 @@
     return head + `<main style="gap:14px">${ajuste}
       <form id="fInv" class="card" style="gap:12px" novalidate><span class="big" style="font-size:17px">${nuevo ? "Datos del elemento" : "Editar datos"}</span>
         <label class="f"><span class="lbl">Enfermería</span><select class="inp" id="vUb">${opts(V.ubicaciones, i.ubicacion)}</select></label>
+        <label class="f"><span class="lbl">Código de barras (opcional)</span><span style="display:flex;gap:8px"><input class="inp" id="vCod" value="${esc(i.codigo || "")}" placeholder="Escanéalo o escríbelo" autocomplete="off"><button class="iconbtn" id="vCodScan" type="button" aria-label="Escanear código" style="background:var(--blue);width:50px;height:50px">${ic("barcode", 20)}</button></span></label>
         <label class="f"><span class="lbl">Elemento</span><input class="inp" id="vEl" value="${esc(i.elemento)}" placeholder="Ej: Gasas estériles"></label>
-        <label class="f"><span class="lbl">Categoría</span><input class="inp" id="vCat" value="${esc(i.categoria)}" placeholder="Ej: Curación, Medicamento, Equipo"></label>
+        <label class="f"><span class="lbl">Categoría</span><select class="inp" id="vCat"><option value="">Selecciona la categoría</option>${(V.categorias || []).filter(c => c.activo || c.codigo === i.categoria).map(c => `<option value="${esc(c.codigo)}" ${c.codigo === i.categoria ? "selected" : ""}>${esc(c.codigo)} · ${esc(c.nombre)}</option>`).join("")}${i.categoria && !(V.categorias || []).some(c => c.codigo === i.categoria) ? `<option value="${esc(i.categoria)}" selected>${esc(i.categoria)} (anterior)</option>` : ""}</select>
+          <span class="hint" id="vCatDesc" style="display:block">${esc(((V.categorias || []).find(c => c.codigo === i.categoria) || {}).descripcion || "")}</span></label>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="f"><span class="lbl">Cantidad</span><input class="inp" id="vCan" inputmode="decimal" value="${esc(i.cantidad)}"></label><label class="f"><span class="lbl">Unidad</span><input class="inp" id="vUn" value="${esc(i.unidad)}" placeholder="und, cajas…"></label></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="f"><span class="lbl">Mínimo</span><input class="inp" id="vMin" inputmode="decimal" value="${esc(i.minimo)}"></label><label class="f"><span class="lbl">Vence</span><input class="inp" id="vVen" type="date" value="${esc(i.vence)}"></label></div>
         <label class="f"><span class="lbl">Lote (opcional)</span><input class="inp" id="vLot" value="${esc(i.lote)}"></label>
@@ -1090,7 +1102,9 @@
     if (!S.inv) { cargarInv(); return; }
     const re = () => { const y = window.scrollY; route(); window.scrollTo(0, y); };
     if (!sub) {
-      $app.querySelectorAll("[data-ub]").forEach(b => b.addEventListener("click", () => { S.invUb = b.dataset.ub; route(); }));
+      $app.querySelectorAll("[data-ub]").forEach(b => b.addEventListener("click", () => { S.invUb = b.dataset.ub; S.invCat = ""; route(); }));
+      $app.querySelectorAll("[data-cat]").forEach(b => b.addEventListener("click", () => { S.invCat = b.dataset.cat; route(); }));
+      $("#invScan").addEventListener("click", () => abrirEscaner("Escanear elemento", alEscanear));
       const qi = $("#invQ"); qi.addEventListener("input", () => { S.invQ = qi.value; const p = qi.selectionStart; route(); const n = $("#invQ"); n.focus(); n.setSelectionRange(p, p); });
       $app.querySelectorAll("[data-adj]").forEach(b => b.addEventListener("click", async () => {
         b.disabled = true;
@@ -1104,17 +1118,148 @@
       setBusy(jb, true);
       try { S.inv = await api("invAjustar", { datos: { id: sub, cambio: c, motivo: $("#jM").value } }); toast("Ajuste aplicado"); location.hash = "#inventario"; } catch (e) { showErr("jErr", e.message); setBusy(jb, false); }
     });
+    const vc = $("#vCat"); if (vc) vc.addEventListener("change", () => { const c = (S.inv.categorias || []).find(k => k.codigo === vc.value); $("#vCatDesc").textContent = c ? c.descripcion : ""; });
+    const cs = $("#vCodScan"); if (cs) cs.addEventListener("click", () => abrirEscaner("Escanear código del elemento", g => {
+      $("#vCod").value = g.codigo; if (g.vence && !$("#vVen").value) $("#vVen").value = g.vence; if (g.lote && !$("#vLot").value) $("#vLot").value = g.lote;
+      toast("Código leído" + (g.vence ? " · vencimiento detectado" : ""));
+    }));
     const f = $("#fInv"); if (f) f.addEventListener("submit", async e => {
       e.preventDefault(); showErr("jErr", "");
-      const datos = { id: sub === "nuevo" ? "" : sub, ubicacion: $("#vUb").value, elemento: $("#vEl").value.trim(), categoria: $("#vCat").value.trim(), cantidad: $("#vCan").value, unidad: $("#vUn").value.trim(), minimo: $("#vMin").value, vence: $("#vVen").value, lote: $("#vLot").value.trim() };
+      const datos = { id: sub === "nuevo" ? "" : sub, ubicacion: $("#vUb").value, elemento: $("#vEl").value.trim(), categoria: $("#vCat").value, cantidad: $("#vCan").value, unidad: $("#vUn").value.trim(), minimo: $("#vMin").value, vence: $("#vVen").value, lote: $("#vLot").value.trim(), codigo: $("#vCod").value.trim() };
       if (!datos.elemento) { showErr("jErr", "Escribe el nombre del elemento."); return; }
+      if (!datos.categoria) { showErr("jErr", "Elige la categoría."); return; }
       const b = $("#vBtn"); setBusy(b, true);
-      try { S.inv = await api("invGuardar", { datos }); S.invUb = datos.ubicacion; toast("Elemento guardado"); location.hash = "#inventario"; } catch (err) { showErr("jErr", err.message); setBusy(b, false); }
+      try { S.inv = await api("invGuardar", { datos }); S.invUb = datos.ubicacion; S.invPrefill = null; toast("Elemento guardado"); location.hash = "#inventario"; } catch (err) { showErr("jErr", err.message); setBusy(b, false); }
     });
     const d = $("#vDel"); if (d) d.addEventListener("click", async () => {
       if (!d.dataset.armed) { d.dataset.armed = "1"; d.textContent = "Toca otra vez para eliminar"; return; }
       setBusy(d, true, "Eliminando…");
       try { S.inv = await api("invEliminar", { datos: { id: sub } }); toast("Elemento eliminado"); location.hash = "#inventario"; } catch (err) { showErr("jErr", err.message); setBusy(d, false); }
+    });
+  }
+
+  /* ---------- código de barras (inventario) ---------- */
+  const ZXING_SRC = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
+  /** Interpreta códigos GS1 (DataMatrix/GS1-128 de medicamentos): (01) GTIN, (17) vencimiento AAMMDD, (10) lote. */
+  function parseGS1(raw) {
+    let t = String(raw || "").replace(/^\]([A-Za-z]\d)/, "").trim();
+    const out = { codigo: t, gtin: "", vence: "", lote: "" };
+    if (/^\(\d{2,4}\)/.test(t)) t = t.replace(/\((\d{2,4})\)/g, "\x1d$1").replace(/^\x1d/, "");
+    else if (!/^(01\d{14}|17\d{6}|10)/.test(t) || t.length < 16) return out;
+    let i = 0;
+    const fijo = { "01": 14, "17": 6, "11": 6, "15": 6 };
+    while (i < t.length) {
+      if (t[i] === "\x1d") { i++; continue; }
+      const ai = t.substr(i, 2); i += 2;
+      if (fijo[ai]) { const v = t.substr(i, fijo[ai]); i += fijo[ai];
+        if (ai === "01") out.gtin = v;
+        if (ai === "17" && /^\d{6}$/.test(v)) { const y = 2000 + +v.slice(0, 2), m = +v.slice(2, 4); let d = +v.slice(4, 6); const ult = new Date(y, m, 0).getDate(); if (!d || d > ult) d = ult; out.vence = y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0"); }
+      } else { let j = t.indexOf("\x1d", i); if (j < 0) j = t.length; const v = t.slice(i, j); i = j; if (ai === "10") out.lote = v; if (!/^\d{2}$/.test(ai)) break; }
+    }
+    if (out.gtin) out.codigo = out.gtin.replace(/^0(?=\d{13}$)/, "");
+    return out;
+  }
+  let escaner = null;
+  function cerrarEscaner() {
+    if (!escaner) return; escaner.stop = true;
+    try { escaner.stream && escaner.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    const el = document.getElementById("scanSheet"); if (el) el.remove(); escaner = null;
+  }
+  async function abrirEscaner(titulo, alLeer) {
+    cerrarEscaner();
+    const el = document.createElement("div"); el.className = "overlay"; el.id = "scanSheet";
+    el.innerHTML = `<div class="install" role="dialog" aria-modal="true" aria-label="${esc(titulo)}"><span class="grab"></span>
+      <div class="row"><span class="big" style="font-size:18px">${esc(titulo)}</span><button class="x" id="scClose" type="button" aria-label="Cerrar">✕</button></div>
+      <div class="scanbox"><video id="scVideo" playsinline muted></video><span class="scanline"></span></div>
+      <p class="hint" id="scMsg" style="display:block;margin:0">Apunta la cámara al código de barras del producto.</p>
+      <form id="scForm" style="display:flex;gap:8px"><input class="inp" id="scManual" placeholder="O escribe / usa lector USB" autocomplete="off" inputmode="text"><button class="iconbtn" type="submit" aria-label="Buscar código" style="background:var(--blue);width:50px;height:50px">${ic("check", 20)}</button></form>
+    </div>`;
+    document.body.appendChild(el);
+    const st = escaner = { stop: false };
+    let listo = false;
+    const fin = txt => { if (listo || !txt) return; listo = true; if (navigator.vibrate) navigator.vibrate(80); const g = parseGS1(txt); cerrarEscaner(); alLeer(g); };
+    el.querySelector("#scClose").addEventListener("click", cerrarEscaner);
+    el.addEventListener("click", e => { if (e.target === el) cerrarEscaner(); });
+    el.querySelector("#scForm").addEventListener("submit", e => { e.preventDefault(); fin(el.querySelector("#scManual").value.trim()); });
+    const video = el.querySelector("#scVideo"), msg = el.querySelector("#scMsg");
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = "Este navegador no permite usar la cámara. Escribe el código o usa un lector USB."; return; }
+    try {
+      st.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+      if (st.stop) { st.stream.getTracks().forEach(t => t.stop()); return; }
+      video.srcObject = st.stream; await video.play();
+      let leer;
+      if ("BarcodeDetector" in window) {
+        const fmts = await BarcodeDetector.getSupportedFormats().catch(() => []);
+        const det = new BarcodeDetector({ formats: fmts.filter(f => ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "data_matrix", "qr_code", "itf"].includes(f)) });
+        leer = async () => { const r = await det.detect(video); return r.length ? r[0].rawValue : ""; };
+      } else {
+        msg.textContent = "Cargando lector…";
+        await loadScript(ZXING_SRC);
+        msg.textContent = "Apunta la cámara al código de barras del producto.";
+        const hints = new Map(); hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        const rd = new ZXing.MultiFormatReader(); rd.setHints(hints);
+        const cv = document.createElement("canvas"), cx = cv.getContext("2d", { willReadFrequently: true });
+        leer = async () => {
+          if (!video.videoWidth) return "";
+          const k = Math.min(1, 960 / video.videoWidth); cv.width = video.videoWidth * k | 0; cv.height = video.videoHeight * k | 0;
+          cx.drawImage(video, 0, 0, cv.width, cv.height);
+          try { return rd.decodeWithState(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(cv)))).getText(); }
+          catch (e) { return ""; } finally { rd.reset(); }
+        };
+      }
+      const loop = async () => { if (st.stop) return; try { const t = await leer(); if (t) return fin(t); } catch (e) {} setTimeout(loop, 200); };
+      loop();
+    } catch (e) {
+      msg.textContent = /Permission|NotAllowed/i.test(e && e.name + e.message) ? "No diste permiso para usar la cámara. Actívalo en la configuración del navegador o escribe el código." : "No se pudo abrir la cámara. Escribe el código o usa un lector USB.";
+    }
+  }
+  function hojaResultado(html, bindFn) {
+    const el = document.createElement("div"); el.className = "overlay"; el.id = "scanRes";
+    el.innerHTML = `<div class="install" role="dialog" aria-modal="true"><span class="grab"></span>${html}<button class="link" id="srClose" type="button">Cerrar</button></div>`;
+    document.body.appendChild(el);
+    const close = () => el.remove();
+    el.addEventListener("click", e => { if (e.target === el) close(); }); el.querySelector("#srClose").addEventListener("click", close);
+    bindFn && bindFn(el, close);
+  }
+  function alEscanear(g) {
+    const V = S.inv, ub = S.invUb || V.ubicaciones[0];
+    const coincide = i => i.codigo && (i.codigo === g.codigo || (g.gtin && i.codigo.replace(/^0+/, "") === g.gtin.replace(/^0+/, "")));
+    const aqui = V.items.find(i => i.ubicacion === ub && coincide(i)), otra = V.items.find(i => i.ubicacion !== ub && coincide(i));
+    const extra = (g.vence ? `<div class="kv"><span>Vence (según código)</span><b>${esc(g.vence)}</b></div>` : "") + (g.lote ? `<div class="kv"><span>Lote</span><b>${esc(g.lote)}</b></div>` : "");
+    if (aqui) {
+      const i = aqui, cambiaV = g.vence && g.vence !== i.vence && V.puedeEditar;
+      hojaResultado(`<div><span class="lbl">${esc(ub)}</span><div class="big">${esc(i.elemento)}</div></div>
+        <div class="kv"><span>Cantidad actual</span><b>${esc(i.cantidad)} ${esc(i.unidad || "")}</b></div>${extra}
+        <label class="f"><span class="lbl">Cantidad</span><input class="inp" id="srCant" inputmode="decimal" value="1"></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><button class="btn ghost" id="srMenos" type="button">− Usé</button><button class="btn primary" id="srMas" type="button">+ Repuse</button></div>
+        ${cambiaV ? `<button class="btn ghost" id="srVence" type="button">${ic("cal", 20)}Actualizar vencimiento a ${esc(g.vence)}</button>` : ""}
+        <button class="link" id="srOtro" type="button">${ic("plus", 16)}Escanear otro</button>`, (el, close) => {
+        const ajustar = async (signo, b) => {
+          const c = +String(el.querySelector("#srCant").value).replace(",", "."); if (!c || c < 0) { toast("Escribe una cantidad válida"); return; }
+          setBusy(b, true);
+          try { S.inv = await api("invAjustar", { datos: { id: i.id, cambio: signo * c, motivo: signo < 0 ? "Uso / consumo (escáner)" : "Reposición (escáner)" } }); close(); toast((signo < 0 ? "Uso" : "Reposición") + " registrado: " + i.elemento); route(); }
+          catch (e) { toast(e.message); setBusy(b, false); }
+        };
+        el.querySelector("#srMenos").addEventListener("click", e => ajustar(-1, e.currentTarget));
+        el.querySelector("#srMas").addEventListener("click", e => ajustar(1, e.currentTarget));
+        el.querySelector("#srOtro").addEventListener("click", () => { close(); abrirEscaner("Escanear elemento", alEscanear); });
+        const bv = el.querySelector("#srVence"); if (bv) bv.addEventListener("click", async () => {
+          setBusy(bv, true);
+          try { S.inv = await api("invGuardar", { datos: Object.assign({}, i, { vence: g.vence, lote: g.lote || i.lote }) }); close(); toast("Vencimiento actualizado"); route(); } catch (e) { toast(e.message); setBusy(bv, false); }
+        });
+      });
+      return;
+    }
+    hojaResultado(`<div class="big">Código no registrado ${otra ? "en " + esc(ub) : ""}</div>
+      <div class="linkbox" style="cursor:default"><span>${esc(g.codigo)}</span></div>${extra}
+      ${otra ? `<div class="note">Este producto está registrado en <b>${esc(otra.ubicacion)}</b> como “${esc(otra.elemento)}”.</div>` : ""}
+      ${V.puedeEditar ? `<button class="btn primary" id="srNuevo" type="button">${ic("plus", 20)}Agregar a ${esc(ub)}</button>` : `<div class="note">Pide a un coordinador Pro que lo agregue al inventario con este código.</div>`}
+      <button class="link" id="srOtro" type="button">Escanear otro</button>`, (el, close) => {
+      el.querySelector("#srOtro").addEventListener("click", () => { close(); abrirEscaner("Escanear elemento", alEscanear); });
+      const n = el.querySelector("#srNuevo"); if (n) n.addEventListener("click", () => {
+        S.invPrefill = { codigo: g.codigo, vence: g.vence, lote: g.lote, ubicacion: ub, elemento: otra ? otra.elemento : "", categoria: otra ? otra.categoria : "", unidad: otra ? otra.unidad : "", minimo: otra ? otra.minimo : "" };
+        close(); location.hash = "#inventario/nuevo";
+      });
     });
   }
 
@@ -1179,7 +1324,9 @@
     if (v !== "indicadores") S.ind = null;
     if (v !== "incidente") S.incOk = null;
     if (v !== "incidentes") S.incL = null;
-    if (v !== "inventario") { S.inv = null; S.invQ = ""; }
+    if (v !== "inventario") { S.inv = null; S.invQ = ""; S.invCat = ""; }
+    if (!(v === "inventario" && arg === "nuevo")) S.invPrefill = null;
+    cerrarEscaner(); { const sr = document.getElementById("scanRes"); if (sr) sr.remove(); }
     if (v !== "reportes") S.rep = null;
     if (v !== "cap") { S.capL = null; S.capD = null; S.capFiltro = ""; }
     if (!(v === "cap" && (arg === "nueva" || arg === "editar"))) S.capEqSel = null;

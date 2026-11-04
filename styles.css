@@ -209,3 +209,13 @@ details.inc summary::-webkit-details-marker{display:none}
 .stepper span{display:flex;flex-direction:column;align-items:center;min-width:44px;font-variant-numeric:tabular-nums}
 .stepper small{font-size:11px;color:var(--muted)}
 .cumple{border-color:var(--blue)}
+.scanbox{position:relative;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:4/3;max-height:52vh}
+.scanbox video{width:100%;height:100%;object-fit:cover;display:block}
+.scanline{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#ff3b3b;box-shadow:0 0 8px #ff3b3b}
+@media (prefers-reduced-motion:no-preference){.scanline{animation:scan 1.8s ease-in-out infinite alternate}@keyframes scan{from{top:25%}to{top:75%}}}
+.chipscroll{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chipscroll::-webkit-scrollbar{display:none}
+.chipscroll .chipbtn{flex:none;font-size:13px;height:38px}
+.cathead{display:flex;align-items:center;gap:8px;margin-top:6px;color:var(--navy)}
+.cathead b{flex:1;font-family:var(--f-disp);font-size:16px}
+.catcode{font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--white);background:var(--navy);padding:3px 7px;border-radius:6px;font-variant-numeric:tabular-nums}
