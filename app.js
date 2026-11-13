@@ -146,15 +146,50 @@
         ${isPro() ? tile("download", "Reportes", "Excel y PDF", "#reportes", "Pro") : ""}
         ${isPro() ? tile("gear", "Configuración", "Usuarios, listas, colores y logo", "#config", "Pro") : ""}
       </div>
-      ${ses ? `<a class="card" href="#intercesion" style="text-decoration:none;color:inherit"><div class="row"><span class="lbl">Próxima intercesión</span>${reg ? '<span class="pill ok">Registrado</span>' : '<span class="pill">Google Meet</span>'}</div><div class="big">${esc(cap(fechaLarga(ses.fecha)))} · ${esc(ses.hora)}</div></a>` : ""}
+      ${ses ? `<div class="card" style="gap:10px"><a href="#intercesion" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:6px"><div class="row"><span class="lbl">${esDiaSesion() ? "Intercesión de hoy" : "Próxima intercesión"}</span>${reg ? `<span class="pill ok">${reg.completa ? "Sesión completa" : "Asistencia registrada"}</span>` : '<span class="pill">Google Meet</span>'}</div><div class="big">${esc(cap(fechaLarga(ses.fecha)))} · ${esc(ses.hora)}</div></a>
+        ${esDiaSesion() ? (reg ? (reg.completa ? "" : `<a class="btn ghost" href="#intercesion">${ic("check", 20)}Al terminar: confirmar sesión completa</a>`) : (perfilInter() ? entrarHTML("Entrar a la intercesión") : `<a class="btn primary" href="#intercesion">${ic("video", 20)}Entrar a la intercesión</a>`)) : ""}</div>` : ""}
       <div class="calls"><a class="call plain" href="tel:${esc(cfg().tel_rohi)}">${ic("phone", 18)}Llamar ROHI</a><a class="call red" href="tel:123">${ic("phone", 18)}Línea 123</a></div>
       <button class="link" id="bInstalar" type="button" ${esStandalone() ? "hidden" : ""}>${ic("download", 18)}Instalar la app en este celular</button>
     </main>`;
   }
 
+  /* ---------- intercesión en un toque ---------- */
+  function perfilInter() {
+    const d = S.data || {}, p = S.perfil || {}, sp = d.perfilIntercesion || {};
+    const min = store.get("brig_min") || sp.ministerio, lid = store.get("brig_lider") || sp.lider_celula;
+    const eqs = d.equipos || [], eq = sp.equipo && eqs.indexOf(sp.equipo) >= 0 ? sp.equipo : (eqs.indexOf(p.equipo) >= 0 ? p.equipo : "");
+    return min && lid && eq ? { nombre: sp.nombre || p.nombre, ministerio: min, lider_celula: lid, equipo: eq } : null;
+  }
+  const esDiaSesion = () => { const ses = (S.data || {}).sesion; return !!ses && ses.fecha === hoyLocal(); };
+  function entrarHTML(txt) {
+    const m = (S.data || {}).meet || ((S.data || {}).registroSesion || {}).meet;
+    if (!m) return "";
+    return `<a class="btn primary entrar" data-entrar href="${esc(m)}" target="_blank" rel="noopener">${ic("video", 22)}${txt || "Entrar a la reunión"}</a>`;
+  }
+  /** Abre Meet y registra la asistencia en segundo plano (sin formulario). */
+  function bindEntrar() {
+    $app.querySelectorAll("[data-entrar]").forEach(a => a.addEventListener("click", () => {
+      const d = S.data || {};
+      if (d.registroSesion) return;
+      const datos = perfilInter(); if (!datos) return;
+      try { fetch(API, { method: "POST", keepalive: true, body: JSON.stringify({ accion: "intercesion", token: S.token, datos }) }).catch(() => {}); } catch (e) {}
+      S.data = Object.assign({}, d, { registroSesion: Object.assign({ meet: a.href, completa: false }, datos) }); store.set("brig_data", S.data);
+      setTimeout(() => { if (/^#?(inicio|intercesion)?$/.test(location.hash.replace("#", "")) || /intercesion/.test(location.hash)) route(); }, 600);
+      toast("Asistencia registrada · " + datos.nombre.split(" ")[0]);
+    }));
+  }
   function vIntercesion() {
     const d = S.data || {}, p = S.perfil || {}, ses = d.sesion || {}, reg = d.registroSesion;
     if (reg) return vIntercesionOk();
+    const pf = perfilInter();
+    if (pf && !S.interEditar && d.meet) return `${topbar("Intercesión de brigada", "Sábados y domingos · " + (ses.hora || "6:00 a.m."))}
+    <main>
+      <div class="card"><div style="display:flex;gap:12px;align-items:center"><span style="width:44px;height:44px;border-radius:12px;background:var(--sky);display:flex;align-items:center;justify-content:center;color:var(--blue)">${ic("video", 22)}</span><div><div class="big" style="font-size:17px">${esc(cap(fechaLarga(ses.fecha)))}</div><div style="font-size:14px;color:var(--muted)">${esc(ses.hora || "")} · Reunión por Google Meet</div></div></div></div>
+      ${entrarHTML()}
+      <div class="hint" style="display:block">Al tocar <b>Entrar</b> quedas registrado automáticamente como <b>${esc(pf.nombre)}</b> · ${esc(pf.equipo)} · ${esc(pf.ministerio)} · Líder: ${esc(pf.lider_celula)}.</div>
+      <button class="link" id="bCambiarDatos" type="button" style="align-self:flex-start;padding:4px 0">${ic("edit", 16)}Cambiar mis datos</button>
+      <div class="note">Al terminar la reunión vuelve a la app y toca <b>Confirmar sesión completa</b> para que tu asistencia cuente completa.</div>
+    </main>`;
     const eqs = d.equipos || [], mins = d.ministerios || [];
     const eqSel = S.equipoSel || (eqs.indexOf(p.equipo) >= 0 ? p.equipo : "");
     return `${topbar("Intercesión de brigada", "Sábados y domingos · " + (ses.hora || "6:00 a.m."))}
@@ -162,13 +197,13 @@
       <div class="card"><div style="display:flex;gap:12px;align-items:center"><span style="width:44px;height:44px;border-radius:12px;background:var(--sky);display:flex;align-items:center;justify-content:center;color:var(--blue)">${ic("video", 22)}</span><div><div class="big" style="font-size:17px">${esc(cap(fechaLarga(ses.fecha)))}</div><div style="font-size:14px;color:var(--muted)">${esc(ses.hora || "")} · Reunión por Google Meet</div></div></div></div>
       <form id="fInter" style="display:flex;flex-direction:column;gap:14px" novalidate>
         <label class="f"><span class="lbl">Nombre del brigadista</span><input class="inp" id="iNom" value="${esc(p.nombre || "")}" autocomplete="name" required></label>
-        <label class="f"><span class="lbl">Ministerio al que pertenece</span><select class="inp" id="iMin" required><option value="">Selecciona tu ministerio</option>${mins.map(m => `<option ${store.get("brig_min") === m ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></label>
-        <label class="f"><span class="lbl">Líder de célula</span><input class="inp" id="iLid" value="${esc(store.get("brig_lider") || "")}" placeholder="Nombre de tu líder" required></label>
+        <label class="f"><span class="lbl">Ministerio al que pertenece</span><select class="inp" id="iMin" required><option value="">Selecciona tu ministerio</option>${mins.map(m => `<option ${(store.get("brig_min") || (d.perfilIntercesion || {}).ministerio) === m ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></label>
+        <label class="f"><span class="lbl">Líder de célula</span><input class="inp" id="iLid" value="${esc(store.get("brig_lider") || (d.perfilIntercesion || {}).lider_celula || "")}" placeholder="Nombre de tu líder" required></label>
         <div class="f" style="display:flex;flex-direction:column;gap:6px"><span class="lbl">Equipo de brigada</span>
           <div class="teams" role="group" aria-label="Equipo de brigada" style="grid-template-columns:repeat(${Math.min(Math.max(eqs.length, 1), 5)},1fr)">${eqs.map(e => `<button type="button" data-eq="${esc(e)}" aria-pressed="${e === eqSel}" aria-label="${esc(e)}">${esc(e.replace(/^Equipo\s*/i, ""))}</button>`).join("")}</div></div>
         <p class="err" id="iErr" hidden></p>
-        <button class="btn primary" id="iBtn" type="submit">${ic("check", 20)}Registrarme y ver el enlace</button>
-        <div class="hint">${ic("lock", 16)}El enlace de la reunión aparece después de registrarte.</div>
+        <button class="btn primary" id="iBtn" type="submit">${ic("video", 20)}Guardar y entrar a la reunión</button>
+        <div class="hint">${ic("lock", 16)}Solo llenas esto una vez. Las próximas veces entras con un solo toque.</div>
       </form>
     </main>`;
   }
@@ -178,7 +213,7 @@
     <main>
       <div class="done"><span class="ring">${ic("check", 38, "var(--ok)", 2.6)}</span><h2>¡Listo, estás registrado!</h2><div style="color:var(--muted)">${esc(cap(fechaLarga(ses.fecha)))} · ${esc(ses.hora || "")}</div></div>
       <div class="card"><div class="kv"><span>Brigadista</span><b>${esc(r.nombre)}</b></div><div class="kv"><span>Ministerio</span><b>${esc(r.ministerio)}</b></div><div class="kv"><span>Líder de célula</span><b>${esc(r.lider_celula)}</b></div><div class="kv"><span>Equipo</span><b>${esc(r.equipo)}</b></div></div>
-      <a class="btn primary" href="${esc(r.meet)}" target="_blank" rel="noopener">${ic("video", 20)}Unirse a la reunión</a>
+      <a class="btn primary entrar" href="${esc(r.meet)}" target="_blank" rel="noopener">${ic("video", 22)}Entrar a la reunión</a>
       <div class="linkbox"><span>${esc(String(r.meet || "").replace(/^https?:\/\//, ""))}</span><button type="button" id="bCopyMeet" aria-label="Copiar enlace">${ic("copy", 18, "var(--blue)")}</button></div>
       ${salidaHTML()}
       <button class="link" id="bCorregir" type="button">${ic("edit", 16)}Corregir mis datos</button>
@@ -1271,7 +1306,7 @@
     const fm = minDe(fin), now = new Date(), nm = now.getHours() * 60 + now.getMinutes();
     const hoy = ses.fecha === hoyLocal(), abierta = hoy && (fm == null || (nm >= fm - 15 && nm <= fm + 90));
     return `<div class="card" style="gap:8px"><span class="big" style="font-size:17px">¿Estuviste hasta el final?</span>
-      <span class="hint" style="display:block">Al terminar la reunión, confirma aquí para registrar tu asistencia completa. Disponible desde 15 minutos antes de las ${esc(fin)}.</span>
+      <span class="hint" style="display:block">Al terminar la reunión, confirma aquí para registrar tu asistencia completa. Disponible desde 15 minutos antes de las ${esc(fin.replace(/\.$/, ""))}.</span>
       <button class="btn ${abierta ? "primary" : "ghost"}" id="bSalida" type="button" ${abierta ? "" : "disabled"}>${ic("check", 20)}${abierta ? "Confirmar sesión completa" : (hoy && fm != null && nm > fm + 90 ? "Tiempo de confirmación cerrado" : "Aún no disponible")}</button></div>`;
   }
   async function confirmarSalida(b) {
@@ -1318,6 +1353,7 @@
     const [v, arg] = h.split("/");
     if (v !== "asistentes") { S.asis = null; S.asisEq = ""; S.asisFecha = ""; }
     if (v !== "turno") { S.turno = null; S.turnoForm = null; }
+    if (v !== "intercesion") S.interEditar = false;
     if (v !== "asistencia") { S.asisSrv = null; S.asisQ = null; }
     if (v !== "config") { S.cfg = null; S.uq = ""; S.uf = ""; }
     if (!(v === "config" && arg === "apariencia")) S.apEdit = null;
@@ -1376,6 +1412,7 @@
     }
     if (v === "inicio" || !v) {
       const s = document.getElementById("bSalir"); if (s) s.addEventListener("click", () => salir());
+      bindEntrar();
       const i = document.getElementById("bInstalar"); if (i) i.addEventListener("click", () => { store.set("brig_install_later", null); openInstall(); });
     }
     if (v === "intercesion") {
@@ -1388,15 +1425,19 @@
         const falta = !datos.nombre ? "tu nombre" : !datos.ministerio ? "tu ministerio" : !datos.lider_celula ? "tu líder de célula" : !datos.equipo ? "tu equipo de brigada" : "";
         if (falta) { showErr("iErr", "Falta " + falta + "."); return; }
         const b = document.getElementById("iBtn"); setBusy(b, true, "Registrando…");
+        let w = null; try { w = window.open("", "_blank"); } catch (e2) {}
         try {
           const r = await api("intercesion", { datos });
-          store.set("brig_min", datos.ministerio); store.set("brig_lider", datos.lider_celula);
+          store.set("brig_min", datos.ministerio); store.set("brig_lider", datos.lider_celula); S.interEditar = false;
           S.data = Object.assign({}, S.data, { sesion: r.sesion, registroSesion: r.registro }); store.set("brig_data", S.data);
-          route(); toast("Registro confirmado");
-        } catch (err) { showErr("iErr", err.message); setBusy(b, false); }
+          if (w && r.registro.meet) w.location.href = r.registro.meet; else if (w) w.close();
+          route(); toast("Asistencia registrada");
+        } catch (err) { if (w) w.close(); showErr("iErr", err.message); setBusy(b, false); }
       });
       const c = document.getElementById("bCopyMeet");
       if (c) c.addEventListener("click", () => { const m = (S.data.registroSesion || {}).meet; (navigator.clipboard ? navigator.clipboard.writeText(m) : Promise.reject()).then(() => toast("Enlace copiado")).catch(() => toast(m)); });
+      bindEntrar();
+      const cd = document.getElementById("bCambiarDatos"); if (cd) cd.addEventListener("click", () => { S.interEditar = true; route(); });
       const k = document.getElementById("bCorregir");
       if (k) k.addEventListener("click", () => { const r = S.data.registroSesion; S.equipoSel = r.equipo; store.set("brig_min", r.ministerio); store.set("brig_lider", r.lider_celula); S.data = Object.assign({}, S.data, { registroSesion: null }); route(); document.getElementById("iNom").value = r.nombre; });
     }
@@ -1451,7 +1492,7 @@
     route();
     if (S.token) setTimeout(maybeOfferInstall, 1500);
   }
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.token) cargarInicio().then(ok => { if (ok && !/editar|intercesion|turno|asistencia|config|cap|reportes|indicadores|incidente|inventario/.test(location.hash)) route(); }); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.token) cargarInicio().then(ok => { if (ok && !/editar|turno|asistencia|config|cap|reportes|indicadores|incidente|inventario/.test(location.hash) && !(S.interEditar && /intercesion/.test(location.hash))) route(); }); });
   if ("serviceWorker" in navigator) {
     const tenia = !!navigator.serviceWorker.controller;
     let recargado = false;
