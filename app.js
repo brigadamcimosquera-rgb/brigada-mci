@@ -6,6 +6,8 @@
   const $toast = document.getElementById("toast");
 
   /* ---------- utilidades ---------- */
+  /** Fechas del servidor: "2026-11-12 19:19:29" (hora local) o ISO antiguas. */
+  const fechaSrv = s => new Date(String(s || "").replace(" ", "T"));
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const store = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
@@ -146,8 +148,8 @@
         ${isPro() ? tile("download", "Reportes", "Excel y PDF", "#reportes", "Pro") : ""}
         ${isPro() ? tile("gear", "Configuración", "Usuarios, listas, colores y logo", "#config", "Pro") : ""}
       </div>
-      ${ses ? `<div class="card" style="gap:10px"><a href="#intercesion" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:6px"><div class="row"><span class="lbl">${esDiaSesion() ? "Intercesión de hoy" : "Próxima intercesión"}</span>${reg ? `<span class="pill ok">${reg.completa ? "Sesión completa" : "Asistencia registrada"}</span>` : '<span class="pill">Google Meet</span>'}</div><div class="big">${esc(cap(fechaLarga(ses.fecha)))} · ${esc(ses.hora)}</div></a>
-        ${esDiaSesion() ? (reg ? (reg.completa ? "" : `<a class="btn ghost" href="#intercesion">${ic("check", 20)}Al terminar: confirmar sesión completa</a>`) : (perfilInter() ? entrarHTML("Entrar a la intercesión") : `<a class="btn primary" href="#intercesion">${ic("video", 20)}Entrar a la intercesión</a>`)) : ""}</div>` : ""}
+      ${ses ? `<div class="card" style="gap:10px"><a href="#intercesion" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:6px"><div class="row"><span class="lbl">${esDiaSesion() ? "Intercesión de hoy" : "Próxima intercesión"}</span>${reg ? (reg.completa ? '<span class="pill ok">Sesión completa</span>' : reg.estado === "sin_confirmar" ? '<span class="pill warn">Sin confirmar</span>' : '<span class="pill ok">Asistencia registrada</span>') : '<span class="pill">Google Meet</span>'}</div><div class="big">${esc(cap(fechaLarga(ses.fecha)))} · ${esc(ses.hora)}</div></a>
+        ${esDiaSesion() ? (reg ? (reg.completa || reg.estado === "sin_confirmar" ? "" : `<a class="btn ghost" href="#intercesion">${ic("check", 20)}Al terminar: confirmar sesión completa</a>`) : (perfilInter() ? entrarHTML("Entrar a la intercesión") : `<a class="btn primary" href="#intercesion">${ic("video", 20)}Entrar a la intercesión</a>`)) : ""}</div>` : ""}
       <div class="calls"><a class="call plain" href="tel:${esc(cfg().tel_rohi)}">${ic("phone", 18)}Llamar ROHI</a><a class="call red" href="tel:123">${ic("phone", 18)}Línea 123</a></div>
       <button class="link" id="bInstalar" type="button" ${esStandalone() ? "hidden" : ""}>${ic("download", 18)}Instalar la app en este celular</button>
     </main>`;
@@ -236,7 +238,7 @@
     const p = protos().find(x => x.id === id);
     if (!p) return `${topbar("Protocolo", "", "#protocolos")}<main><div class="card">Este protocolo ya no existe.</div></main>`;
     const pasos = String(p.pasos || "").split("\n").filter(Boolean);
-    const fecha = p.actualizado ? new Date(p.actualizado).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" }) : "";
+    const fecha = p.actualizado ? fechaSrv(p.actualizado).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" }) : "";
     return `${topbar(p.titulo, "Protocolo" + (isPro() ? " · editable" : ""), "#protocolos")}
     <main style="gap:14px">
       ${p.telefono ? `<a class="btn navy" href="tel:${esc(p.telefono)}">${ic("phone", 20)}Llamar · ${esc(fmtTel(p.telefono))}</a>` : ""}
@@ -283,8 +285,8 @@
     return head + `<main style="gap:14px">
       <label class="f"><span class="lbl">Sesión</span><select class="inp" id="aFecha">${A.fechas.map(x => `<option value="${esc(x)}" ${x === A.fecha ? "selected" : ""}>${esc(cap(fechaLarga(x)))}</option>`).join("")}</select></label>
       ${isPro() && eqs.length > 1 ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${["", ...eqs].map(e => `<button type="button" class="pill" data-aeq="${esc(e)}" style="height:38px;padding:0 14px;border:${e === f ? "0" : "1.5px solid var(--line)"};background:${e === f ? "var(--navy)" : "var(--white)"};color:${e === f ? "var(--white)" : "var(--navy)"};cursor:pointer">${e ? esc(e) + " · " + porEq[e] : "Todos · " + A.registros.length}</button>`).join("")}</div>` : ""}
-      <div class="row"><span class="big">${lista.length} ${lista.length === 1 ? "asistente" : "asistentes"} · ${lista.filter(r => r.completa).length} completas</span>${!isPro() ? `<span class="pill">${esc(S.perfil.equipo || "")}</span>` : ""}</div>
-      ${lista.length ? `<div style="display:flex;flex-direction:column;gap:8px">${lista.map(r => `<div class="card" style="gap:4px;padding:12px 14px"><div class="row"><b>${esc(r.nombre)}</b><span style="display:flex;gap:4px"><span class="pill ${r.completa ? "ok" : "warn"}">${r.completa ? "Completa" : "Solo ingreso"}</span><span class="pill">${esc(r.equipo)}</span></span></div><div style="font-size:13px;color:var(--muted)">${esc(r.ministerio)} · Líder: ${esc(r.lider_celula)}</div></div>`).join("")}</div>`
+      <div class="row"><span class="big">${lista.length} ${lista.length === 1 ? "asistente" : "asistentes"} · ${lista.filter(r => r.completa).length} completas${lista.some(r => r.estado === "sin_confirmar") ? " · " + lista.filter(r => r.estado === "sin_confirmar").length + " sin confirmar" : ""}</span>${!isPro() ? `<span class="pill">${esc(S.perfil.equipo || "")}</span>` : ""}</div>
+      ${lista.length ? `<div style="display:flex;flex-direction:column;gap:8px">${lista.map(r => `<div class="card" style="gap:4px;padding:12px 14px"><div class="row"><b>${esc(r.nombre)}</b><span style="display:flex;gap:4px"><span class="pill ${r.completa ? "ok" : r.estado === "sin_confirmar" ? "warn" : ""}">${r.completa ? "Completa" : r.estado === "sin_confirmar" ? "Sin confirmar" : "Pendiente"}</span><span class="pill">${esc(r.equipo)}</span></span></div><div style="font-size:13px;color:var(--muted)">${esc(r.ministerio)} · Líder: ${esc(r.lider_celula)}</div></div>`).join("")}</div>`
         : `<div class="card" style="color:var(--muted)">Nadie ${isPro() ? "" : "de tu equipo "}se ha registrado a esta sesión todavía.</div>`}
       ${!isPro() ? `<div class="hint">${ic("lock", 16)}Como coordinador de equipo solo ves a ${esc(S.perfil.equipo || "tu equipo")}.</div>` : ""}
     </main>`;
@@ -548,7 +550,7 @@
     return head + `<main style="gap:14px">${filtroHTML()}
       <div class="kpis">
         ${kpi(sv.participacion + "%", "Participación en servicios", sv.presentes + " de " + sv.registros + " en lista")}
-        ${kpi(it.promedio, "Promedio en intercesión", it.registros + " registros · " + (it.completas || 0) + " completas")}
+        ${kpi(it.promedio, "Promedio en intercesión", it.registros + " registros · " + (it.completas || 0) + " completas · " + (it.sinConfirmar || 0) + " sin confirmar")}
         ${kpi(inc.total, "Incidentes registrados", (inc.conAlerta || 0) + " con alerta · " + (inc.rohi || 0) + " con ROHI")}
         ${kpi(tu.conNovedad + "/" + tu.total, "Turnos con novedad", "Recibidos en el periodo")}
         ${kpi(ca.pctCapacitados + "%", "Brigadistas capacitados", ca.realizadas + " capacitaciones")}
@@ -988,7 +990,7 @@
       </div>
       <div class="row"><span class="big">${esc(A.equipo)}</span><span class="pill">${A.modo === "dia" ? cap(A.dia) + " · " + SV.length + " reuniones" : esc(SV[0])}</span></div>
       ${A.modo === "dia" ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${SV.map(s => `<span class="pill ${pres(s) ? "ok" : ""}">${esc(corto(s))}: ${pres(s)}/${A.roster.length}</span>`).join("")}</div>` : `<div><span class="pill ${pres(SV[0]) ? "ok" : ""}">${pres(SV[0])} de ${A.roster.length} presentes</span></div>`}
-      ${A.guardado ? `<div class="done-banner">${ic("check", 22, "var(--ok)", 2.6)}<div><b>Asistencia ya confirmada por ${esc(A.guardado)}</b><div>${esc(cap(fechaCorta(A.fecha)))}${A.guardadoEn ? " · " + esc(new Date(A.guardadoEn).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" })) : ""}</div></div></div>` : ""}
+      ${A.guardado ? `<div class="done-banner">${ic("check", 22, "var(--ok)", 2.6)}<div><b>Asistencia ya confirmada por ${esc(A.guardado)}</b><div>${esc(cap(fechaCorta(A.fecha)))}${A.guardadoEn ? " · " + esc(fechaSrv(A.guardadoEn).toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit" })) : ""}</div></div></div>` : ""}
       ${edit && A.roster.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="chipbtn" id="sTodos" type="button">✓ Todos a todo</button>${SV.length > 1 ? SV.map(s => `<button class="chipbtn" type="button" data-col="${esc(s)}">✓ ${esc(corto(s))}</button>`).join("") : ""}</div><div class="hint">Toca cada reunión para marcar asistencia. Si alguien falta, elige el motivo.</div>` : ""}
       <div style="display:flex;flex-direction:column;gap:8px">${A.roster.map(r => fila(r, false)).join("") || `<div class="card" style="color:var(--muted)">No hay brigadistas activos en ${esc(A.equipo)}.</div>`}</div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px"><span class="big">Apoyo semanal</span>
@@ -1302,11 +1304,12 @@
   const minDe = h => { const m = String(h || "").toLowerCase().match(/(\d{1,2})(?::(\d{2}))?\s*(a|p)?/); if (!m) return null; let x = +m[1] % 12; if (m[3] === "p") x += 12; if (!m[3] && +m[1] === 12) x = 12; return x * 60 + +(m[2] || 0); };
   function salidaHTML() {
     const d = S.data || {}, r = d.registroSesion || {}, ses = d.sesion || {}, fin = cfg().fin_intercesion || "7:00 a.m.";
+    if (r.estado === "sin_confirmar" && !r.completa) return `<div class="note" style="background:var(--warn-soft);color:var(--warn)"><b>Sesión sin confirmar.</b> El tiempo para confirmar que estuviste hasta el final ya cerró; tu asistencia quedó registrada como ingreso sin confirmación.</div>`;
     if (r.completa) return `<div class="done-banner">${ic("check", 22, "var(--ok)", 2.6)}<div><b>Sesión completa confirmada</b><div>Gracias por estar hasta el final.</div></div></div>`;
     const fm = minDe(fin), now = new Date(), nm = now.getHours() * 60 + now.getMinutes();
     const hoy = ses.fecha === hoyLocal(), abierta = hoy && (fm == null || (nm >= fm - 15 && nm <= fm + 90));
     return `<div class="card" style="gap:8px"><span class="big" style="font-size:17px">¿Estuviste hasta el final?</span>
-      <span class="hint" style="display:block">Al terminar la reunión, confirma aquí para registrar tu asistencia completa. Disponible desde 15 minutos antes de las ${esc(fin.replace(/\.$/, ""))}.</span>
+      <span class="hint" style="display:block">Al terminar la reunión, confirma aquí para registrar tu asistencia completa. Disponible desde 15 minutos antes de las ${esc(fin.replace(/\.$/, ""))} y hasta hora y media después. Si no confirmas, tu asistencia quedará como <b>Sin confirmar</b>.</span>
       <button class="btn ${abierta ? "primary" : "ghost"}" id="bSalida" type="button" ${abierta ? "" : "disabled"}>${ic("check", 20)}${abierta ? "Confirmar sesión completa" : (hoy && fm != null && nm > fm + 90 ? "Tiempo de confirmación cerrado" : "Aún no disponible")}</button></div>`;
   }
   async function confirmarSalida(b) {
